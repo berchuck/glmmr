@@ -11,55 +11,108 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// rcpparma_hello_world
-arma::mat rcpparma_hello_world();
-RcppExport SEXP _glmmr_rcpparma_hello_world() {
+// glmmr_sgd_Rcpp
+arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List, Rcpp::List HyPara_List, Rcpp::List SgdObj_List, Rcpp::List Para_List, bool Interactive);
+RcppExport SEXP _glmmr_glmmr_sgd_Rcpp(SEXP DatObj_ListSEXP, SEXP HyPara_ListSEXP, SEXP SgdObj_ListSEXP, SEXP Para_ListSEXP, SEXP InteractiveSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(rcpparma_hello_world());
+    Rcpp::traits::input_parameter< Rcpp::List >::type DatObj_List(DatObj_ListSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type HyPara_List(HyPara_ListSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type SgdObj_List(SgdObj_ListSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type Para_List(Para_ListSEXP);
+    Rcpp::traits::input_parameter< bool >::type Interactive(InteractiveSEXP);
+    rcpp_result_gen = Rcpp::wrap(glmmr_sgd_Rcpp(DatObj_List, HyPara_List, SgdObj_List, Para_List, Interactive));
     return rcpp_result_gen;
 END_RCPP
 }
-// rcpparma_outerproduct
-arma::mat rcpparma_outerproduct(const arma::colvec& x);
-RcppExport SEXP _glmmr_rcpparma_outerproduct(SEXP xSEXP) {
+// Play
+void Play();
+RcppExport SEXP _glmmr_Play() {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Play();
+    return R_NilValue;
+END_RCPP
+}
+// GetZ
+arma::mat GetZ(arma::vec const& l, int q);
+RcppExport SEXP _glmmr_GetZ(SEXP lSEXP, SEXP qSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_outerproduct(x));
+    Rcpp::traits::input_parameter< arma::vec const& >::type l(lSEXP);
+    Rcpp::traits::input_parameter< int >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(GetZ(l, q));
     return rcpp_result_gen;
 END_RCPP
 }
-// rcpparma_innerproduct
-double rcpparma_innerproduct(const arma::colvec& x);
-RcppExport SEXP _glmmr_rcpparma_innerproduct(SEXP xSEXP) {
+// GetL
+arma::mat GetL(arma::mat const& z, int q);
+RcppExport SEXP _glmmr_GetL(SEXP zSEXP, SEXP qSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_innerproduct(x));
+    Rcpp::traits::input_parameter< arma::mat const& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< int >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(GetL(z, q));
     return rcpp_result_gen;
 END_RCPP
 }
-// rcpparma_bothproducts
-Rcpp::List rcpparma_bothproducts(const arma::colvec& x);
-RcppExport SEXP _glmmr_rcpparma_bothproducts(SEXP xSEXP) {
+// vecLT
+arma::colvec vecLT(arma::mat const& x);
+RcppExport SEXP _glmmr_vecLT(SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_bothproducts(x));
+    Rcpp::traits::input_parameter< arma::mat const& >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(vecLT(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// CholInv
+arma::mat CholInv(arma::mat const& Cov);
+RcppExport SEXP _glmmr_CholInv(SEXP CovSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat const& >::type Cov(CovSEXP);
+    rcpp_result_gen = Rcpp::wrap(CholInv(Cov));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Inv3
+arma::mat Inv3(arma::mat const& A);
+RcppExport SEXP _glmmr_Inv3(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat const& >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(Inv3(A));
+    return rcpp_result_gen;
+END_RCPP
+}
+// makeSymm
+arma::mat makeSymm(arma::mat const& A);
+RcppExport SEXP _glmmr_makeSymm(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat const& >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(makeSymm(A));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_glmmr_rcpparma_hello_world", (DL_FUNC) &_glmmr_rcpparma_hello_world, 0},
-    {"_glmmr_rcpparma_outerproduct", (DL_FUNC) &_glmmr_rcpparma_outerproduct, 1},
-    {"_glmmr_rcpparma_innerproduct", (DL_FUNC) &_glmmr_rcpparma_innerproduct, 1},
-    {"_glmmr_rcpparma_bothproducts", (DL_FUNC) &_glmmr_rcpparma_bothproducts, 1},
+    {"_glmmr_glmmr_sgd_Rcpp", (DL_FUNC) &_glmmr_glmmr_sgd_Rcpp, 5},
+    {"_glmmr_Play", (DL_FUNC) &_glmmr_Play, 0},
+    {"_glmmr_GetZ", (DL_FUNC) &_glmmr_GetZ, 2},
+    {"_glmmr_GetL", (DL_FUNC) &_glmmr_GetL, 2},
+    {"_glmmr_vecLT", (DL_FUNC) &_glmmr_vecLT, 1},
+    {"_glmmr_CholInv", (DL_FUNC) &_glmmr_CholInv, 1},
+    {"_glmmr_Inv3", (DL_FUNC) &_glmmr_Inv3, 1},
+    {"_glmmr_makeSymm", (DL_FUNC) &_glmmr_makeSymm, 1},
     {NULL, NULL, 0}
 };
 
