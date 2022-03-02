@@ -5,7 +5,7 @@
 //not for use by users.
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
-arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
+arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
                             Rcpp::List SgdObj_List, Rcpp::List Para_List,
                             bool Interactive) {
 
@@ -29,16 +29,17 @@ arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   BeginBurnInProgress(SgdObj, Interactive);
   
   //Loop over epochs
+  arma::mat Omega_out(n_omega, n_epochs);
   for (arma::uword e = 1; e < (n_epochs + 1); e++) {
-    
-    Rcpp::Rcout << std::fixed << Para.Omega << std::endl;
+
+    // Rcpp::Rcout << std::fixed << Para.Beta << Para.Sigma << std::endl;
     
     //Check for user interrupt every 1 epochs
     if (e % 1 == 0) Rcpp::checkUserInterrupt();
     
     //Sample mini-batches
     arma::colvec samps = sampleRcpp(Seqn, S, true, Probn);
-      
+
     //Calculate gradient contribution for each subject
     arma::colvec grad_likelihood(n_omega, arma::fill::zeros);
     for (arma::uword s = 0; s < S; s++) {
@@ -70,11 +71,14 @@ arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
     if (!Interactive) if (std::find(WhichBurnInProgressInt.begin(), WhichBurnInProgressInt.end(), e) != WhichBurnInProgressInt.end())
       UpdateBurnInBarInt(e, SgdObj);
     
+    //Save output
+    Omega_out.col(e - 1) = Para.Omega;
+    
   //End loop over epochs
   }
 
   //Return raw samples
-  return Para.Omega;
+  return Omega_out;
 
 //End MCMC sampler function
 }

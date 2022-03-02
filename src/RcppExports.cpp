@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // glmmr_sgd_Rcpp
-arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List, Rcpp::List HyPara_List, Rcpp::List SgdObj_List, Rcpp::List Para_List, bool Interactive);
+arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List, Rcpp::List HyPara_List, Rcpp::List SgdObj_List, Rcpp::List Para_List, bool Interactive);
 RcppExport SEXP _glmmr_glmmr_sgd_Rcpp(SEXP DatObj_ListSEXP, SEXP HyPara_ListSEXP, SEXP SgdObj_ListSEXP, SEXP Para_ListSEXP, SEXP InteractiveSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

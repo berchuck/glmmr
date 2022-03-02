@@ -96,6 +96,7 @@ CreateSgdObj <- function(sgd, DatObj) {
   p <- DatObj$p
   q <- DatObj$q
   n_L <- DatObj$n_L
+  n <- DatObj$n
   
   ###Which parameters are user defined?
   UserSgds <- names(sgd)
@@ -116,9 +117,9 @@ CreateSgdObj <- function(sgd, DatObj) {
   if ("Nu_nadam" %in% UserSgds) Nu_nadam <- sgd$Nu_nadam
   if (!("Nu_nadam" %in% UserSgds)) Nu_nadam <- 0.999
   
-  ###Set S # size of the minibatches 
+  ###Set S # size of the mini-batches 
   if ("S" %in% UserSgds) S <- sgd$S
-  if (!("S" %in% UserSgds)) S <- 10
+  if (!("S" %in% UserSgds)) S <- round(n * 0.1)
   
   ###Set n_epochs
   if ("n_epochs" %in% UserSgds) n_epochs <- sgd$n_epochs
@@ -143,9 +144,9 @@ CreateSgdObj <- function(sgd, DatObj) {
   SgdObj$Mu_nadam <- Mu_nadam
   SgdObj$Alpha_nadam <- Alpha_nadam
   SgdObj$Nu_nadam <- Nu_nadam
-  SgdObj$S <- 10
-  SgdObj$n_epochs <- 50000
-  SgdObj$R <- 500
+  SgdObj$S <- S
+  SgdObj$n_epochs <- n_epochs
+  SgdObj$R <- R
   SgdObj$BarLength <- BarLength
   SgdObj$WhichBurnInProgress <- WhichBurnInProgress
   SgdObj$WhichBurnInProgressInt <- WhichBurnInProgressInt
@@ -211,7 +212,7 @@ CreatePara <- function(starting, DatObj, HyPara) {
   Para$Upsilon <- Upsilon
   Para$Sigma <- Sigma
   Para$LInv <- LInv
-  Para$tLInv <- t(LInv)
+  Para$tLInv <- tLInv
   Para$UpsilonInv <- UpsilonInv
   Para$DInv <- DInv
   Para$SigmaInv <- SigmaInv

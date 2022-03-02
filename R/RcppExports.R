@@ -2,34 +2,34 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 glmmr_sgd_Rcpp <- function(DatObj_List, HyPara_List, SgdObj_List, Para_List, Interactive) {
-    .Call(`_glmmr_glmmr_sgd_Rcpp`, DatObj_List, HyPara_List, SgdObj_List, Para_List, Interactive)
+    .Call('_glmmr_glmmr_sgd_Rcpp', PACKAGE = 'glmmr', DatObj_List, HyPara_List, SgdObj_List, Para_List, Interactive)
 }
 
 Play <- function() {
-    invisible(.Call(`_glmmr_Play`))
+    invisible(.Call('_glmmr_Play', PACKAGE = 'glmmr'))
 }
 
 GetZ <- function(l, q) {
-    .Call(`_glmmr_GetZ`, l, q)
+    .Call('_glmmr_GetZ', PACKAGE = 'glmmr', l, q)
 }
 
 GetL <- function(z, q) {
-    .Call(`_glmmr_GetL`, z, q)
+    .Call('_glmmr_GetL', PACKAGE = 'glmmr', z, q)
 }
 
 vecLT <- function(x) {
-    .Call(`_glmmr_vecLT`, x)
+    .Call('_glmmr_vecLT', PACKAGE = 'glmmr', x)
 }
 
 CholInv <- function(Cov) {
-    .Call(`_glmmr_CholInv`, Cov)
+    .Call('_glmmr_CholInv', PACKAGE = 'glmmr', Cov)
 }
 
 Inv3 <- function(A) {
-    .Call(`_glmmr_Inv3`, A)
+    .Call('_glmmr_Inv3', PACKAGE = 'glmmr', A)
 }
 
 makeSymm <- function(A) {
-    .Call(`_glmmr_makeSymm`, A)
+    .Call('_glmmr_makeSymm', PACKAGE = 'glmmr', A)
 }
 

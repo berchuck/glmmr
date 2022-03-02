@@ -7,14 +7,8 @@
 #' @name glmmr
 #' @docType package
 #' @import Rcpp
-#' @importFrom stats quantile rnorm runif median model.frame model.matrix
-#' @importFrom graphics abline axis layout par plot points polygon title segments symbols rect text lines
-#' @importFrom grDevices col2rgb colorRampPalette
-#' @importFrom utils tail
-#' @importFrom stats dnorm lm sd var pnorm
-#' @importFrom msm rtnorm
+#' @importFrom stats rnorm model.matrix
 #' @importFrom Matrix bdiag
-#' @importFrom mvtnorm pmvnorm
 #' @importFrom pgdraw pgdraw
 #' @useDynLib glmmr
 NULL

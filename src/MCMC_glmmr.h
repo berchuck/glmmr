@@ -6,9 +6,9 @@
 #define __glmmr__
 
 //SGD Function
-arma::colvec glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
-                            Rcpp::List SgdObj_List, Rcpp::List Para_List,
-                            bool Interactive);
+arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
+                         Rcpp::List SgdObj_List, Rcpp::List Para_List,
+                         bool Interactive);
 
 //STRUCT DEFINITIONS
 struct datobj {
