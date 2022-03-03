@@ -258,7 +258,7 @@ arma::colvec ComputeGradienti(int id, arma::mat const& Gamma_i, datobj DatObj, h
     for (arma::uword k = 0; k < q; k++) {
       double sum1 = 0;
       for (arma::uword h = 0; h < q; h++) sum1 += M(h, k) * exp(-d(h));
-      grad_re_d(k) = -1 + exp(-d(k)) * sum1 - M(k, k) * exp(-2 * d(k));
+      grad_re_d(k) = -1 + exp(-d(k)) * sum1;
     }
     grad_D_likelihood += grad_re_d;
   }

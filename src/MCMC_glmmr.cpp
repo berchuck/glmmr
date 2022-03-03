@@ -17,6 +17,7 @@ arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
 
   //Set objects to be used in the for loop
   int n_epochs = SgdObj.n_epochs;
+  int n = DatObj.n;
   int S = SgdObj.S;
   arma::Col<int> Seqn = DatObj.Seqn;
   arma::colvec Probn = DatObj.Probn;
@@ -58,7 +59,7 @@ arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
     arma::colvec grad_prior = ComputeGradientPrior(DatObj, HyPara, Para);
   
     //Final gradient computation
-    arma::colvec grad = grad_prior + grad_likelihood;
+    arma::colvec grad = grad_prior + (n / S) * grad_likelihood;
 
     //Take a step in parameter space and update all parameters 
     Update = UpdateOmega(grad, DatObj, HyPara, SgdObj, Para);
