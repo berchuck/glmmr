@@ -2,51 +2,30 @@
 #include "MCMC_glmmr.h"
 
 //Function to update parameters using NADAM
-std::pair<para, sgdobj> UpdateOmega(arma::colvec const& grad, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para) {
-
+para UpdatePara(datobj DatObj, para Para) {
+  
   //Set data objects
-  int p = DatObj.p;
-  int n_L = DatObj.n_L;
-  int q = DatObj.q;
-  int n_omega = DatObj.n_omega;
+  int P = DatObj.P;
+  int NL = DatObj.NL;
+  int Q = DatObj.Q;
   arma::mat EyeQ = DatObj.EyeQ;
   
-  //Set hyperparameters
-
-  //Set sgd objects
-  arma::vec M_nadam = SgdObj.M_nadam;
-  arma::vec N_nadam = SgdObj.N_nadam;
-  double Nu_nadam = SgdObj.Nu_nadam;
-  double Mu_nadam = SgdObj.Mu_nadam;
-  double Alpha_nadam = SgdObj.Alpha_nadam;
-  double Epsilon = SgdObj.Epsilon;
-
   //Set parameters
   arma::colvec Omega = Para.Omega;
   
-  //Update omega using NADAM
-  double mhat, nhat;
-  for (arma::uword i = 0; i < n_omega; i++) {
-    M_nadam(i) = Mu_nadam * M_nadam(i) + (1 - Mu_nadam) * grad(i);
-    N_nadam(i) = Nu_nadam * N_nadam(i) + (1 - Nu_nadam) * pow(grad(i), 2);
-    mhat = (Mu_nadam * M_nadam(i) / (1 - Mu_nadam)) + ((1 - Mu_nadam) * grad(i) / (1 - Mu_nadam));
-    nhat = Nu_nadam * N_nadam(i) / (1 - Nu_nadam);
-    Omega(i) = Omega(i) + Alpha_nadam / (sqrt(nhat) + Epsilon) * mhat;
-  }
-
   //Update other parameters
-  arma::colvec Beta = Omega(arma::span(0, p - 1));
-  arma::colvec l = Omega(arma::span(p, p + n_L - 1));
-  arma::colvec d = Omega(arma::span(p + n_L, p + n_L + q - 1));
+  arma::colvec Beta = Omega(arma::span(0, P - 1));
+  arma::colvec l = Omega(arma::span(P, P + NL - 1));
+  arma::colvec d = Omega(arma::span(P + NL, P + NL + Q - 1));
   
   //Save parameters
   Para.Omega = Omega;
   Para.Beta = Beta;
   Para.l = l;
   Para.d = d;
-  Para.z = GetZ(l, q);
-  Para.L = GetL(Para.z, q);
-  Para.Loverz = vecLT(Para.L / Para.z);
+  Para.Z = GetZ(l, Q);
+  Para.L = GetL(Para.Z, Q);
+  Para.LoverZ = vecLT(Para.L / Para.Z);
   Para.D = arma::diagmat(arma::exp(d));
   Para.Upsilon = Para.L * arma::trans(Para.L);
   Para.Sigma = Para.D * Para.Upsilon * Para.D;
@@ -55,16 +34,62 @@ std::pair<para, sgdobj> UpdateOmega(arma::colvec const& grad, datobj DatObj, hyp
   Para.UpsilonInv = Para.tLInv * Para.LInv;
   Para.DInv = arma::diagmat(arma::exp(-d));
   Para.SigmaInv = Para.DInv * Para.UpsilonInv * Para.DInv;
-  Para.gradLz = arma::diagmat(Para.Loverz);
-  Para.gradzl = arma::diagmat(arma::pow(arma::cosh(l), -2));
-  Para.gradLl = Para.gradLz * Para.gradzl;
+  Para.GradLZ = arma::diagmat(Para.LoverZ);
+  Para.GradZl = arma::diagmat(arma::pow(arma::cosh(l), -2));
+  Para.GradLl = Para.GradLZ * Para.GradZl;
   
-  //Update sgd object
-  SgdObj.M_nadam = M_nadam;
-  SgdObj.N_nadam = N_nadam;
+  //Return updated object
+  return Para;
+
+}
+
+
+
+//Function to update Omega
+std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatObj, tuning TuningObj, para Para) {
   
-  //Return updated objects
-  return std::pair<para, sgdobj>(Para, SgdObj);
+  //Set data objects
+  int NOmega = DatObj.NOmega;
+
+  //Set tuning objects
+  double EpsilonNADAM = TuningObj.EpsilonNADAM;
+  double MuNADAM = TuningObj.MuNADAM;
+  double NuNADAM = TuningObj.NuNADAM;
+  double AlphaNADAM = TuningObj.AlphaNADAM;
+  arma::vec MNADAM = TuningObj.MNADAM;
+  arma::vec NNADAM = TuningObj.NNADAM;
+  double EpsilonSGLD = TuningObj.EpsilonSGLD;
+  int NEpochs = TuningObj.NEpochs;
+  
+  //Set parameters
+  arma::colvec Omega = Para.Omega;
+  
+  //Update omega using NADAM
+  if (e < (NEpochs + 1)) {
+    double mhat, nhat;
+    for (arma::uword i = 0; i < NOmega; i++) {
+      MNADAM(i) = MuNADAM * MNADAM(i) + (1 - MuNADAM) * Grad(i);
+      NNADAM(i) = NuNADAM * NNADAM(i) + (1 - NuNADAM) * pow(Grad(i), 2);
+      mhat = (MuNADAM * MNADAM(i) / (1 - MuNADAM)) + ((1 - MuNADAM) * Grad(i) / (1 - MuNADAM));
+      nhat = NuNADAM * NNADAM(i) / (1 - NuNADAM);
+      Omega(i) = Omega(i) + AlphaNADAM / (sqrt(nhat) + EpsilonNADAM) * mhat;
+    }
+  }
+  
+  //Update omega using SGLD
+  if (e > NEpochs) {
+    Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD)));
+  }
+  
+  //Update parameter object
+  Para.Omega = Omega;
+  
+  //Update tuning object
+  TuningObj.MNADAM = MNADAM;
+  TuningObj.NNADAM = NNADAM;
+  
+  //Return updated Omega
+  return std::pair<para, tuning>(Para, TuningObj);
   
 }
 
@@ -74,8 +99,8 @@ std::pair<para, sgdobj> UpdateOmega(arma::colvec const& grad, datobj DatObj, hyp
 arma::colvec ComputeGradientPrior(datobj DatObj, hypara HyPara, para Para) {
   
   //Set data objects
-  int q = DatObj.q;
-  int p = DatObj.p;
+  int Q = DatObj.Q;
+  int P = DatObj.P;
 
   //Set hyperparameters
   double Eta = HyPara.Eta;
@@ -83,21 +108,21 @@ arma::colvec ComputeGradientPrior(datobj DatObj, hypara HyPara, para Para) {
   
   //Set parameters
   arma::mat L = Para.L;
-  arma::mat gradLl = Para.gradLl;
-  arma::mat z = Para.z;
+  arma::mat GradLl = Para.GradLl;
+  arma::mat Z = Para.Z;
   arma::colvec d = Para.d;
   
   //Prior contribution for Beta
-  arma::colvec grad_beta_prior(p, arma::fill::zeros);
+  arma::colvec grad_beta_prior(P, arma::fill::zeros);
   
   //Prior contribution for l
-  arma::mat grad_1_L(q, q, arma::fill::zeros), grad_2_L(q, q, arma::fill::zeros);
-  for (arma::uword i = 0; i < q; i++) {
-    for (arma::uword j = 0; j < q; j++) {
+  arma::mat grad_1_L(Q, Q, arma::fill::zeros), grad_2_L(Q, Q, arma::fill::zeros);
+  for (arma::uword i = 0; i < Q; i++) {
+    for (arma::uword j = 0; j < Q; j++) {
       if (i > j) {
         double sum1 = 0;
         for (arma::uword h = 0; h < i; h++) sum1 += L(i, h) * L(i, h);
-        grad_1_L(i, j) = -((q - (i + 1) + 2 * Eta - 2) * L(i, j)) / (1 - sum1);
+        grad_1_L(i, j) = -((Q - (i + 1) + 2 * Eta - 2) * L(i, j)) / (1 - sum1);
         if (i > 1) {
           if (j < (i - 1)) {
             double sum2 = 0;
@@ -112,14 +137,14 @@ arma::colvec ComputeGradientPrior(datobj DatObj, hypara HyPara, para Para) {
       }
     }
   }
-  arma::colvec grad_1_l = vecLT(grad_1_L) * gradLl;
-  arma::colvec grad_2_l = vecLT(grad_2_L) * gradLl;
-  arma::colvec grad_3_l = -2 * arma::diagmat(vecLT(z));
+  arma::colvec grad_1_l = vecLT(grad_1_L) * GradLl;
+  arma::colvec grad_2_l = vecLT(grad_2_L) * GradLl;
+  arma::colvec grad_3_l = -2 * arma::diagmat(vecLT(Z));
   arma::colvec grad_l_prior = grad_1_l + grad_2_l + grad_3_l;
   
   //Prior contribution for d
-  arma::colvec grad_d_prior(q);
-  for (arma::uword k = 0; k < q; k++) grad_d_prior(k) = (Nu - Nu * exp(2 * d(k))) / (Nu + exp(2 * d(k)));
+  arma::colvec grad_d_prior(Q);
+  for (arma::uword k = 0; k < Q; k++) grad_d_prior(k) = (Nu - Nu * exp(2 * d(k))) / (Nu + exp(2 * d(k)));
 
   //Final prior gradient contribution
   arma::colvec grad_prior = arma::join_cols(grad_beta_prior, grad_l_prior, grad_d_prior);
@@ -191,43 +216,40 @@ arma::mat get_grad_w_L(arma::mat const& L, arma::colvec const& v, arma::colvec c
 
 
 //Function to compute likelihood gradient component for unit i
-arma::colvec ComputeGradienti(int id, arma::mat const& Gamma_i, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para) {
+arma::colvec ComputeGradientI(int Id, arma::mat const& GammaI, datobj DatObj, tuning TuningObj, para Para) {
 
   //Set data objects
-  int p = DatObj.p;
-  int q = DatObj.q;
-  int n_L = DatObj.n_L;
+  int P = DatObj.P;
+  int Q = DatObj.Q;
+  int NL = DatObj.NL;
   arma::colvec Y = DatObj.Y;
   arma::mat X = DatObj.X;
   arma::mat Z = DatObj.Z;
-  arma::Col<int> group = DatObj.group;
-  arma::Col<int> group2 = DatObj.group2;
-  
-  //Set hyperparameters
-  
-  //Set sgd objects
-  int R = SgdObj.R;
+  arma::Col<int> Group = DatObj.Group;
+  arma::Col<int> Group2 = DatObj.Group2;
+
+  //Set tuning objects
+  int R = TuningObj.R;
   
   //Set parameters
   arma::colvec Beta = Para.Beta;
-  arma::mat SigmaInv = Para.SigmaInv;
   arma::mat DInv = Para.DInv;
   arma::mat LInv = Para.LInv;
-  arma::mat gradLl = Para.gradLl;
+  arma::mat GradLl = Para.GradLl;
   arma::mat L = Para.L;
   arma::mat UpsilonInv = Para.UpsilonInv;
   arma::colvec d = Para.d;
   
   //Prepare data
-  arma::uvec indeces_row = arma::find(group == id);
-  arma::uvec indeces_col = arma::find(group2 == id);
+  arma::uvec indeces_row = arma::find(Group == Id);
+  arma::uvec indeces_col = arma::find(Group2 == Id);
   arma::mat x_i = X.rows(indeces_row);
   arma::colvec x_i_beta = x_i * Beta;
   arma::mat z_i = Z.submat(indeces_row, indeces_col);
   arma::colvec y_i = Y(indeces_row);
   
   //Compute GLMM mean parameter
-  arma::mat theta_i = arma::repmat(x_i_beta, 1, R) + z_i * Gamma_i;
+  arma::mat theta_i = arma::repmat(x_i_beta, 1, R) + z_i * GammaI;
   arma::mat fit_i = arma::exp(theta_i);
   bool any_inf = fit_i.has_inf();
   arma::mat pi_i = fit_i / (1 + fit_i);
@@ -241,23 +263,23 @@ arma::colvec ComputeGradienti(int id, arma::mat const& Gamma_i, datobj DatObj, h
   }
   
   //Initialize objects
-  arma::colvec grad_beta_likelihood(p, arma::fill::zeros);
-  arma::colvec grad_L_likelihood(n_L, arma::fill::zeros); 
-  arma::colvec grad_D_likelihood(q, arma::fill::zeros); 
-  arma::colvec grad_re_d(q, arma::fill::zeros); 
+  arma::colvec grad_beta_likelihood(P, arma::fill::zeros);
+  arma::colvec grad_L_likelihood(NL, arma::fill::zeros); 
+  arma::colvec grad_D_likelihood(Q, arma::fill::zeros); 
+  arma::colvec grad_re_d(Q, arma::fill::zeros); 
     
   //Compute gradients by looping over R
   for (arma::uword r = 1; r < R; r++) {
-    arma::colvec gamma_ir = Gamma_i.col(r);
+    arma::colvec gamma_ir = GammaI.col(r);
     grad_beta_likelihood += arma::trans(arma::trans(y_i - pi_i.col(r)) * x_i);
     arma::colvec v = DInv * gamma_ir;
     arma::colvec w = LInv * v;
-    grad_L_likelihood += (get_grad_1_L(L, q) - arma::trans(w) * get_grad_w_L(L, v, w, n_L, q)) * gradLl;
+    grad_L_likelihood += (get_grad_1_L(L, Q) - arma::trans(w) * get_grad_w_L(L, v, w, NL, Q)) * GradLl;
     arma::mat Gamma_r = arma::diagmat(gamma_ir);
     arma::mat M = Gamma_r * UpsilonInv * Gamma_r;
-    for (arma::uword k = 0; k < q; k++) {
+    for (arma::uword k = 0; k < Q; k++) {
       double sum1 = 0;
-      for (arma::uword h = 0; h < q; h++) sum1 += M(h, k) * exp(-d(h));
+      for (arma::uword h = 0; h < Q; h++) sum1 += M(h, k) * exp(-d(h));
       grad_re_d(k) = -1 + exp(-d(k)) * sum1;
     }
     grad_D_likelihood += grad_re_d;
@@ -274,28 +296,26 @@ arma::colvec ComputeGradienti(int id, arma::mat const& Gamma_i, datobj DatObj, h
 } 
 
 //Function to sample random effects
-arma::mat SampleGamma(int id, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para) {
+arma::mat SampleGamma(int Id, datobj DatObj, tuning TuningObj, para Para) {
 
   //Set data objects
-  int q = DatObj.q;
+  int Q = DatObj.Q;
   arma::colvec Y = DatObj.Y;
   arma::mat X = DatObj.X;
   arma::mat Z = DatObj.Z;
-  arma::Col<int> group = DatObj.group;
-  arma::Col<int> group2 = DatObj.group2;
+  arma::Col<int> Group = DatObj.Group;
+  arma::Col<int> Group2 = DatObj.Group2;
   
-  //Set hyperparameters
-
-  //Set sgd objects
-  int R = SgdObj.R;
+  //Set tuning objects
+  int R = TuningObj.R;
   
   //Set parameters
   arma::colvec Beta = Para.Beta;
   arma::mat SigmaInv = Para.SigmaInv;
   
   //Prepare data
-  arma::uvec indeces_row = arma::find(group == id);
-  arma::uvec indeces_col = arma::find(group2 == id);
+  arma::uvec indeces_row = arma::find(Group == Id);
+  arma::uvec indeces_col = arma::find(Group2 == Id);
   arma::mat x_i = X.rows(indeces_row);
   arma::colvec x_i_beta = x_i * Beta;
   arma::mat z_i = Z.submat(indeces_row, indeces_col);
@@ -303,7 +323,7 @@ arma::mat SampleGamma(int id, datobj DatObj, hypara HyPara, sgdobj SgdObj, para 
   int n_i = x_i.n_rows;
   
   //Initialize output object
-  arma::mat Gamma(q, R, arma::fill::zeros);
+  arma::mat Gamma(Q, R, arma::fill::zeros);
   
   //Loop over R
   for (arma::uword r = 1; r < R; r++) {
@@ -334,8 +354,8 @@ arma::mat SampleGamma(int id, datobj DatObj, hypara HyPara, sgdobj SgdObj, para 
 //Function to get z matrix-------------------------------------------
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
-arma::mat GetZ(arma::vec const& l, int q) {
-  arma::mat z(q, q, arma::fill::zeros);
+arma::mat GetZ(arma::vec const& l, int Q) {
+  arma::mat z(Q, Q, arma::fill::zeros);
   arma::uvec upper_indices = arma::trimatu_ind(arma::size(z), 1);
   z.elem(upper_indices) += arma::tanh(l);
   return z.t();
@@ -346,17 +366,17 @@ arma::mat GetZ(arma::vec const& l, int q) {
 //Function to get L matrix-------------------------------------------
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
-arma::mat GetL(arma::mat const& z, int q) {
-  arma::mat L(q, q, arma::fill::zeros);
-  for (arma::uword i = 0; i < q; i++) {
-    for (arma::uword j = 0; j < q; j++) {
+arma::mat GetL(arma::mat const& Z, int Q) {
+  arma::mat L(Q, Q, arma::fill::zeros);
+  for (arma::uword i = 0; i < Q; i++) {
+    for (arma::uword j = 0; j < Q; j++) {
       if (j == 0) {
         if (i == 0) L(i, j) = 1;
-        if (i > j) L(i, j) = z(i, j);
+        if (i > j) L(i, j) = Z(i, j);
       }
       if (j > 0) {
         arma::rowvec Li = L.row(i);
-        if (i > j) L(i, j) = z(i, j) * sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2))));         
+        if (i > j) L(i, j) = Z(i, j) * sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2))));         
         if (i == j) L(i, j) = sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2))));         
       }
     }

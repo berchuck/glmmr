@@ -5,81 +5,99 @@
 //not for use by users.
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
-arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
-                            Rcpp::List SgdObj_List, Rcpp::List Para_List,
-                            bool Interactive) {
+Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
+                      Rcpp::List TuningObj_List, Rcpp::List Para_List,
+                      bool Interactive) {
 
-  //Convet Rcpp::Lists to C++ structs
+  //Convert Rcpp::Lists to C++ structs
   datobj DatObj = ConvertDatObj(DatObj_List);
   hypara HyPara = ConvertHyPara(HyPara_List);
-  sgdobj SgdObj = ConvertSgdObj(SgdObj_List);
+  tuning TuningObj = ConvertTuningObj(TuningObj_List);
   para Para = ConvertPara(Para_List);
 
   //Set objects to be used in the for loop
-  int n_epochs = SgdObj.n_epochs;
-  int n = DatObj.n;
-  int S = SgdObj.S;
-  arma::Col<int> Seqn = DatObj.Seqn;
-  arma::colvec Probn = DatObj.Probn;
-  int n_omega = DatObj.n_omega;
-  std::pair<para, sgdobj> Update;
-  arma::vec WhichBurnInProgress = SgdObj.WhichBurnInProgress;
-  arma::vec WhichBurnInProgressInt = SgdObj.WhichBurnInProgressInt;
+  int NEpochs = TuningObj.NEpochs;
+  int NTotal = TuningObj.NTotal;
+  int NUnits = DatObj.NUnits;
+  int S = TuningObj.S;
+  int NOmega = DatObj.NOmega;
+  int NKeep = TuningObj.NKeep;
+  arma::Col<int> SeqNUnits = DatObj.SeqNUnits;
+  arma::colvec ProbNUnits = DatObj.ProbNUnits;
+  arma::vec WhichKeep = TuningObj.WhichKeep;
+  arma::vec WhichMAPProgress = TuningObj.WhichMAPProgress;
+  arma::vec WhichMAPProgressInt = TuningObj.WhichMAPProgressInt;
+  arma::vec WhichSamplerProgress = TuningObj.WhichSamplerProgress;
+  std::pair<para, tuning> Update;
   
   //User output
-  BeginBurnInProgress(SgdObj, Interactive);
+  BeginMAPProgress(TuningObj, Interactive);
+  
+  //Initialize objects
+  int Id;
+  arma::mat OmegaMat(NOmega, NKeep), GammaI(DatObj.Q, TuningObj.R);
+  arma::colvec Samps(S), GradLikelihood(NOmega), GradPrior(NOmega), Grad(NOmega);
+  arma::colvec OmegaMAP(NOmega);
   
   //Loop over epochs
-  arma::mat Omega_out(n_omega, n_epochs);
-  for (arma::uword e = 1; e < (n_epochs + 1); e++) {
+  for (arma::uword e = 1; e < (NTotal + 1); e++) {
 
-    // Rcpp::Rcout << std::fixed << Para.Beta << Para.Sigma << std::endl;
-    
     //Check for user interrupt every 1 epochs
     if (e % 1 == 0) Rcpp::checkUserInterrupt();
     
     //Sample mini-batches
-    arma::colvec samps = sampleRcpp(Seqn, S, true, Probn);
+    Samps = sampleRcpp(SeqNUnits, S, true, ProbNUnits);
 
     //Calculate gradient contribution for each subject
-    arma::colvec grad_likelihood(n_omega, arma::fill::zeros);
+    GradLikelihood.zeros();
     for (arma::uword s = 0; s < S; s++) {
-      
+
       //Sample random effects
-      int id = samps(s);
-      arma::mat Gamma_i = SampleGamma(id, DatObj, HyPara, SgdObj, Para);
-      
+      Id = Samps(s);
+      GammaI = SampleGamma(Id, DatObj, TuningObj, Para);
+
       //Compute likelihood contribution for group i
-      grad_likelihood += ComputeGradienti(id, Gamma_i, DatObj, HyPara, SgdObj, Para);
-      
-    //End loop over mini-batch samples 
+      GradLikelihood += ComputeGradientI(Id, GammaI, DatObj, TuningObj, Para);
+
+    //End loop over mini-batch samples
     }
     
     //Calculate gradient contribution from the prior          
-    arma::colvec grad_prior = ComputeGradientPrior(DatObj, HyPara, Para);
+    GradPrior = ComputeGradientPrior(DatObj, HyPara, Para);
   
     //Final gradient computation
-    arma::colvec grad = grad_prior + (n / S) * grad_likelihood;
+    Grad = GradPrior + (NUnits / S) * GradLikelihood;
 
-    //Take a step in parameter space and update all parameters 
-    Update = UpdateOmega(grad, DatObj, HyPara, SgdObj, Para);
+    //Update omega
+    Update = UpdateOmega(e, Grad, DatObj, TuningObj, Para);
     Para = Update.first;
-    SgdObj = Update.second;
-
-    //Update burn-in progress bar
-    if (Interactive) if (std::find(WhichBurnInProgress.begin(), WhichBurnInProgress.end(), e) != WhichBurnInProgress.end())
-      UpdateBurnInBar(e, SgdObj);
-    if (!Interactive) if (std::find(WhichBurnInProgressInt.begin(), WhichBurnInProgressInt.end(), e) != WhichBurnInProgressInt.end())
-      UpdateBurnInBarInt(e, SgdObj);
+    TuningObj = Update.second;
     
-    //Save output
-    Omega_out.col(e - 1) = Para.Omega;
+    //Update other parameters
+    Para = UpdatePara(DatObj, Para);
+    
+    //Save parameters
+    if (e == NEpochs) OmegaMAP = Para.Omega;
+    if (std::find(WhichKeep.begin(), WhichKeep.end(), e) != WhichKeep.end())
+      OmegaMat.cols(find(e == WhichKeep)) = Para.Omega;
+      
+    //Update MAP progress bar
+    if (Interactive) if (std::find(WhichMAPProgress.begin(), WhichMAPProgress.end(), e) != WhichMAPProgress.end())
+      UpdateMAPBar(e, TuningObj);
+    if (!Interactive) if (std::find(WhichMAPProgressInt.begin(), WhichMAPProgressInt.end(), e) != WhichMAPProgressInt.end())
+      UpdateMAPBarInt(e, TuningObj);
+    
+    //Update SGMCMC progress bar
+    if (e == NEpochs) Rcpp::Rcout << std::fixed << "\nSampler progress:  0%.. ";
+    if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
+      SamplerProgress(e, TuningObj);
     
   //End loop over epochs
   }
 
   //Return raw samples
-  return Omega_out;
-
+  return Rcpp::List::create(Rcpp::Named("map") = OmegaMAP,
+                            Rcpp::Named("samples") = OmegaMat);
+  
 //End MCMC sampler function
 }

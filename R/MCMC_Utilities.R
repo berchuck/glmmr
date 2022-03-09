@@ -1,52 +1,37 @@
 ###Function for summarizing the raw MCMC samples-------------------------------------------------------------------
-FormatSamples <- function(DatObj, RawSamples) {
+FormatSamples <- function(DatObj, OmegaSamples) {
 
   ###Set data objects
-  M <- DatObj$M
-  K <- DatObj$K
-  Nu <- DatObj$Nu
-  O <- DatObj$O
-  C <- DatObj$C
   P <- DatObj$P
-  GS <- DatObj$GS
-  CL <- DatObj$CL
+  Q <- DatObj$Q
+  NL <- DatObj$NL
   
   ###Format raw samples
-  RawSamples <- t(RawSamples)
-  Lambda <- RawSamples[, 1:(O * M * K)]
-  Eta <- RawSamples[, (O * M * K + 1):(O * M * K + K * Nu), drop = FALSE]
-  if (C == O) Sigma2 <- NULL
-  if (C != O) Sigma2 <- RawSamples[, (O * M * K + K * Nu + 1):(O * M * K + K * Nu + M * (O - C))]
-  Kappa <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + 1):(O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2), drop = FALSE]
-  Delta <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + 1):(O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K), drop = FALSE]
-  if (GS == 1) Tau <- matrix(t(apply(Delta, 1, cumprod)), ncol = K)
-  if (GS == 0) Tau <- Delta
-  Upsilon <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + 1):(O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2), drop = FALSE]
-  Psi <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1), drop = FALSE]
-  Xi <- RawSamples[, (O * M * K + K * Nu + M  * (O - C)+ (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1 + 1):(O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1 + O * M * K)]
-  Rho <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1 + O * M * K + 1), drop = FALSE]
-  if (P > 1) Beta <- RawSamples[, (O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1 + O * M * K + 1 + 1):(O * M * K + K * Nu + M * (O - C) + (O * (O + 1)) / 2 + K + (K * (K + 1)) / 2 + 1 + O * M * K + 1 + P), drop = FALSE]
-  LambdaInd <- expand.grid(1:K, 1:M, 1:O)
-  colnames(Lambda) <- paste0("Lambda_", LambdaInd[, 3], "_", LambdaInd[, 2], "_", LambdaInd[, 1])
-  EtaInd <- expand.grid(1:K, 1:Nu)
-  colnames(Eta) <- paste0("Eta", EtaInd[, 2], "_", EtaInd[, 1])
-  if (C != O) Sigma2Ind <- expand.grid(which(DatObj$FamilyInd != 3), 1:M)
-  if (C != O) colnames(Sigma2) <- paste0("Sigma2_", Sigma2Ind[, 1], "_", Sigma2Ind[, 2])
-  KappaInd <- which(lower.tri(apply(matrix(1:O, ncol = 1), 1, function(x) paste0(paste0("Kappa", 1:O, "_"), x)), diag = TRUE), arr.ind = TRUE)
-  if (O == 1) colnames(Kappa) <- apply(matrix(1:O, ncol = 1), 1, function(x) paste0(paste0("Kappa", 1:O, "_"), x))[KappaInd[order(KappaInd[, 1]), ]][1]
-  if (O > 1) colnames(Kappa) <- apply(matrix(1:O, ncol = 1), 1, function(x) paste0(paste0("Kappa", 1:O, "_"), x))[KappaInd[order(KappaInd[, 1]), ]]
-  colnames(Delta) <- paste0("Delta", 1:K)
-  colnames(Tau) <- paste0("Tau", 1:K)
-  UpsilonInd <- which(lower.tri(apply(matrix(1:K, ncol = 1), 1, function(x) paste0(paste0("Upsilon", 1:K, "_"), x)), diag = TRUE), arr.ind = TRUE)
-  if (K == 1) colnames(Upsilon) <- apply(matrix(1:K, ncol = 1), 1, function(x) paste0(paste0("Upsilon", 1:K, "_"), x))[UpsilonInd[order(UpsilonInd[, 1]), ]][1]
-  if (K > 1) colnames(Upsilon) <- apply(matrix(1:K, ncol = 1), 1, function(x) paste0(paste0("Upsilon", 1:K, "_"), x))[UpsilonInd[order(UpsilonInd[, 1]), ]]
-  colnames(Psi) <- "Psi"
-  colnames(Xi) <- paste0("Xi_", LambdaInd[, 3], "_", LambdaInd[, 2], "_", LambdaInd[, 1])
-  colnames(Rho) <- "Rho"
-  if (P == 0) Beta <- NULL
-  if (P > 0) colnames(Beta) <- paste0("Beta", 1:P)
-  if (CL == 0) Tau <- Delta <- Xi <- NULL
-  Out <- list(Lambda = Lambda, Eta = Eta, Sigma2 = Sigma2, Kappa = Kappa, Delta = Delta, Tau = Tau, Upsilon = Upsilon, Psi = Psi, Xi = Xi, Rho = Rho, Beta = Beta)
+  OmegaSamples <- t(OmegaSamples)
+  NSims <- nrow(OmegaSamples)
+  Beta <- OmegaSamples[, 1:P, drop = FALSE]
+  l <- OmegaSamples[, (P + NL):(P + NL), drop = FALSE]
+  d <- OmegaSamples[, (P + NL + 1):(P + NL + Q), drop = FALSE]
+  colnames(Beta) <- paste0("Beta", 0:(P - 1))
+  colnames(l) <- paste0("l", 1:NL)
+  colnames(d) <- paste0("d", 1:Q)
+  Upsilon <- matrix(nrow = NSims, ncol = NL)
+  Sigma <- matrix(nrow = NSims, ncol = NL + Q)
+  for (s in 1:NSims) {
+    L <- GetL(GetZ(l[s, ], Q), Q)
+    UpsilonMat <- L %*% t(L)
+    D <- diag(exp(d[s, ]))
+    SigmaMat <- D %*% UpsilonMat %*% D
+    Upsilon[s, ] <- UpsilonMat[lower.tri(UpsilonMat, diag = FALSE)]
+    Sigma[s, ] <- SigmaMat[lower.tri(SigmaMat, diag = TRUE)]
+  }
+  SigmaInd <- which(lower.tri(apply(matrix(1:Q, ncol = 1), 1, function(x) paste0(paste0("Sigma", 1:Q), x)), diag = TRUE), arr.ind = TRUE)
+  if (Q == 1) colnames(Sigma) <- apply(matrix(1:Q, ncol = 1), 1, function(x) paste0(paste0("Sigma", 1:Q), x))[SigmaInd[order(SigmaInd[, 1]), ]][1]
+  if (Q > 1) colnames(Sigma) <- apply(matrix(1:Q, ncol = 1), 1, function(x) paste0(paste0("Sigma", 1:Q), x))[SigmaInd[order(SigmaInd[, 1]), ]]
+  
+  UpsilonInd <- which(lower.tri(apply(matrix(1:Q, ncol = 1), 1, function(x) paste0(paste0("Upsilon", 1:Q, "_"), x)), diag = FALSE), arr.ind = TRUE)
+  colnames(Upsilon) <- paste0("Upsilon", paste0(UpsilonInd, collapse = ""))
+  Out <- list(Beta = Beta, l = l, d = d, Upsilon = Upsilon, Sigma = Sigma)
   return(Out)
 }
 
@@ -86,79 +71,73 @@ OutputDatObj <- function(DatObj) {
 
 
 
-###Function for creating a data augmentation object that contains objects needed for ModelFit----------------------
-OutputDatAug <- function(DatAug) {
-
-  ###Collect needed objects
-  # DatAugOut <- list(NBelow = DatAug$NBelow,
-  #                   NBelowList = DatAug$NBelowList,
-  #                   TobitBooleanMat = DatAug$TobitBooleanMat,
-  #                   YStarNonZeroList = DatAug$YStarNonZero)
-  DatAugOut <- DatAug
-  return(DatAugOut)
-
-}
-
-
-
-###Function for summarizing Metropolis objects post sampler--------------------------------------------------------
-SummarizeMetropolis <- function(DatObj, MetrObj, MetropRcpp, McmcObj) {
-
-  ###Set data object
-  SpCorInd <- DatObj$SpCorInd
-  IS <- DatObj$IS
-
-  ###Set MCMC object
-  NSims <- McmcObj$NSims
-
-  ###Set Metropolis objects
-  MetropPsi <- MetropRcpp$MetropPsi
-  AcceptancePsi <- MetropRcpp$AcceptancePsi
-  OriginalTuners <- MetrObj$OriginalTuners[1]
-  AcceptancePct <- AcceptancePsi / NSims
-  MetrSummary <- cbind(AcceptancePct, MetropPsi, OriginalTuners)
-  rownames(MetrSummary) <- "Psi"
-  colnames(MetrSummary) <- c("Acceptance", "PilotAdaptedTuners", "OriginalTuners")
-  
-  ###Add Rho
-  if (SpCorInd == 0 & IS == 1) {
-    MetropRho <- MetropRcpp$MetropRho
-    AcceptanceRho <- MetropRcpp$AcceptanceRho
-    OriginalTuners <- MetrObj$OriginalTuners
-    AcceptancePct <- c(AcceptancePsi, AcceptanceRho) / NSims
-    MetrSummary <- cbind(AcceptancePct, c(MetropPsi, MetropRho), OriginalTuners)
-    rownames(MetrSummary) <- c("Psi", "Rho")
-    colnames(MetrSummary) <- c("Acceptance", "PilotAdaptedTuners", "OriginalTuners")
-  }
-
-  ###Summarize and output
-  return(MetrSummary)
-
-}
-
-
-
 ###Verify the class of our regression object------------------------------------------------------------------------
-#' is.spBFA
+#' is.glmmr
 #'
-#' \code{is.spBFA} is a general test of an object being interpretable as a
-#' \code{\link{spBFA}} object.
+#' \code{#' is.glmmr} is a general test of an object being interpretable as a
+#' \code{\link{glmmr}} object.
 #'
 #' @param x object to be tested.
 #'
-#' @details The \code{\link{spBFA}} class is defined as the regression object that
-#'  results from the \code{\link{spBFA}} regression function.
+#' @details The \code{\link{glmmr}} class is defined as the regression object that
+#'  results from the \code{\link{glmmr}} regression function.
 #'
-#' @return \code{is.spBFA} returns a logical, depending on whether the object is of class \code{\link{spBFA}}.
+#' @return \code{is.glmmr} returns a logical, depending on whether the object is of class \code{\link{glmmr}}.
 #'   
 #' @examples 
 #' ###Load pre-computed results
-#' data(reg.bfa_sp)
+#' data(reg_glmmr)
 #' 
 #' ###Test function
-#' is.spBFA(reg.bfa_sp)
+#' is.glmmr(reg_glmmr)
 #'
 #' @export
-is.spBFA <- function(x) {
-  identical(attributes(x)$class, "spBFA")
+is.glmmr <- function(x) {
+  identical(attributes(x)$class, "glmmr")
+}
+
+
+
+###GetL
+#' GetL
+#'
+#' \code{GetL} is a function to computes the Cholesky factor for a correlation matrix from the intermediate matrix Z.
+#'
+#' @param Z Z matrix
+#' @param Q dimension of the correlation matrix
+#'
+#' @return \code{GetL} returns a matrix of size Q
+#'   
+#' @examples 
+#' ###Test function
+#' l <- -0.34
+#' Z <- GetZ(l, 2)
+#' L <- GetL(Z, 2)
+#'
+#' @export
+GetL <- function(Z, Q) {
+  GetL(Z, Q)
+}
+
+
+
+###GetZ
+#' GetZ
+#'
+#' \code{GetZ} is a function to compute the intermediate step for the Cholesky factor of a correlation matrix.
+#'
+#' @param l l vector of unconstrained parameters
+#' @param Q dimension of the correlation matrix
+#'
+#' @return \code{GetZ} returns a matrix of size Q
+#'   
+#' @examples 
+#' ###Test function
+#' l <- -0.34
+#' Z <- GetZ(l, 2)
+#' L <- GetL(Z, 2)
+#'
+#' @export
+GetZ <- function(l, Q) {
+  GetZ(l, Q)
 }

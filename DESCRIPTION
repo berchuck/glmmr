@@ -12,6 +12,6 @@ LazyDataCompression: xz
 RoxygenNote: 7.1.2
 NeedsCompilation: yes
 Depends: R (>= 3.0.2)
-Imports: pgdraw (>= 1.0), Rcpp (>= 0.12.9), stats
+Imports: Matrix, pgdraw (>= 1.0), Rcpp (>= 0.12.9), stats
 LinkingTo: Rcpp, RcppArmadillo (>= 0.7.500.0.0)
 Language: en-US

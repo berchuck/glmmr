@@ -11,51 +11,42 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// glmmr_sgd_Rcpp
-arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List, Rcpp::List HyPara_List, Rcpp::List SgdObj_List, Rcpp::List Para_List, bool Interactive);
-RcppExport SEXP _glmmr_glmmr_sgd_Rcpp(SEXP DatObj_ListSEXP, SEXP HyPara_ListSEXP, SEXP SgdObj_ListSEXP, SEXP Para_ListSEXP, SEXP InteractiveSEXP) {
+// glmmr_Rcpp
+Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List, Rcpp::List HyPara_List, Rcpp::List TuningObj_List, Rcpp::List Para_List, bool Interactive);
+RcppExport SEXP _glmmr_glmmr_Rcpp(SEXP DatObj_ListSEXP, SEXP HyPara_ListSEXP, SEXP TuningObj_ListSEXP, SEXP Para_ListSEXP, SEXP InteractiveSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::List >::type DatObj_List(DatObj_ListSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type HyPara_List(HyPara_ListSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type SgdObj_List(SgdObj_ListSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type TuningObj_List(TuningObj_ListSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type Para_List(Para_ListSEXP);
     Rcpp::traits::input_parameter< bool >::type Interactive(InteractiveSEXP);
-    rcpp_result_gen = Rcpp::wrap(glmmr_sgd_Rcpp(DatObj_List, HyPara_List, SgdObj_List, Para_List, Interactive));
+    rcpp_result_gen = Rcpp::wrap(glmmr_Rcpp(DatObj_List, HyPara_List, TuningObj_List, Para_List, Interactive));
     return rcpp_result_gen;
 END_RCPP
 }
-// Play
-void Play();
-RcppExport SEXP _glmmr_Play() {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Play();
-    return R_NilValue;
-END_RCPP
-}
 // GetZ
-arma::mat GetZ(arma::vec const& l, int q);
-RcppExport SEXP _glmmr_GetZ(SEXP lSEXP, SEXP qSEXP) {
+arma::mat GetZ(arma::vec const& l, int Q);
+RcppExport SEXP _glmmr_GetZ(SEXP lSEXP, SEXP QSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::vec const& >::type l(lSEXP);
-    Rcpp::traits::input_parameter< int >::type q(qSEXP);
-    rcpp_result_gen = Rcpp::wrap(GetZ(l, q));
+    Rcpp::traits::input_parameter< int >::type Q(QSEXP);
+    rcpp_result_gen = Rcpp::wrap(GetZ(l, Q));
     return rcpp_result_gen;
 END_RCPP
 }
 // GetL
-arma::mat GetL(arma::mat const& z, int q);
-RcppExport SEXP _glmmr_GetL(SEXP zSEXP, SEXP qSEXP) {
+arma::mat GetL(arma::mat const& Z, int Q);
+RcppExport SEXP _glmmr_GetL(SEXP ZSEXP, SEXP QSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat const& >::type z(zSEXP);
-    Rcpp::traits::input_parameter< int >::type q(qSEXP);
-    rcpp_result_gen = Rcpp::wrap(GetL(z, q));
+    Rcpp::traits::input_parameter< arma::mat const& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< int >::type Q(QSEXP);
+    rcpp_result_gen = Rcpp::wrap(GetL(Z, Q));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -105,8 +96,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_glmmr_glmmr_sgd_Rcpp", (DL_FUNC) &_glmmr_glmmr_sgd_Rcpp, 5},
-    {"_glmmr_Play", (DL_FUNC) &_glmmr_Play, 0},
+    {"_glmmr_glmmr_Rcpp", (DL_FUNC) &_glmmr_glmmr_Rcpp, 5},
     {"_glmmr_GetZ", (DL_FUNC) &_glmmr_GetZ, 2},
     {"_glmmr_GetL", (DL_FUNC) &_glmmr_GetL, 2},
     {"_glmmr_vecLT", (DL_FUNC) &_glmmr_vecLT, 1},

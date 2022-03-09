@@ -5,55 +5,61 @@
 #ifndef __glmmr__
 #define __glmmr__
 
-//SGD Function
-arma::mat glmmr_sgd_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
-                         Rcpp::List SgdObj_List, Rcpp::List Para_List,
-                         bool Interactive);
+//GLMMR Function
+Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
+                      Rcpp::List TuningObj_List, Rcpp::List Para_List,
+                      bool Interactive);
 
 //STRUCT DEFINITIONS
 struct datobj {
   arma::colvec Y;
   arma::mat X;
   arma::mat Z;
-  arma::Col<int> group;
-  arma::Col<int> group2;
+  arma::Col<int> Group;
+  arma::Col<int> Group2;
   int N;
-  int n;
-  int p;
-  int q;
-  int n_L;
+  int NUnits;
+  int P;
+  int Q;
+  int NL;
   int FamilyInd;
   arma::mat EyeQ;
-  arma::Col<int> Seqn;
-  arma::colvec Probn;
-  int n_omega;
+  arma::Col<int> SeqNUnits;
+  arma::colvec ProbNUnits;
+  int NOmega;
 };
 struct hypara {
   double Eta;
   double Nu;
 };
-struct sgdobj {
-  double Epsilon;
-  arma::vec M_nadam;
-  arma::vec N_nadam;
-  double Mu_nadam;
-  double Alpha_nadam;
-  double Nu_nadam;
-  double S;
-  double n_epochs;
-  double R;
+struct tuning {
+  double EpsilonNADAM;
+  double MuNADAM;
+  double AlphaNADAM;
+  double NuNADAM;
+  arma::vec MNADAM;
+  arma::vec NNADAM;
+  int S;
+  int NEpochs;
+  int R;
+  double EpsilonSGLD;
+  int NSims;
+  int NTotal;
+  int NKeep;
   int BarLength;
-  arma::vec WhichBurnInProgressInt;
-  arma::vec WhichBurnInProgress;
+  arma::vec WhichKeep;
+  arma::vec WhichMAPProgress;
+  arma::vec WhichMAPProgressInt;
+  arma::vec WhichSamplerProgress;
 };
 struct para {
   arma::colvec Beta;
   arma::colvec l;
   arma::colvec d;
   arma::colvec Omega;
-  arma::mat z;
+  arma::mat Z;
   arma::mat L;
-  arma::vec Loverz;
+  arma::vec LoverZ;
   arma::mat D;
   arma::mat Upsilon;
   arma::mat Sigma;
@@ -62,9 +68,9 @@ struct para {
   arma::mat UpsilonInv;
   arma::mat DInv;
   arma::mat SigmaInv;
-  arma::mat gradLz;
-  arma::mat gradzl;
-  arma::mat gradLl;
+  arma::mat GradLZ;
+  arma::mat GradZl;
+  arma::mat GradLl;
 };
 
 //DISTRIBUTION FUNCTIONS
@@ -88,21 +94,23 @@ arma::vec pgRcpp(arma::vec const& b, arma::vec const& c);
 //CONVERSION FUNCTIONS
 datobj ConvertDatObj(Rcpp::List DatObj_List);
 hypara ConvertHyPara(Rcpp::List HyPara_List);
-sgdobj ConvertSgdObj(Rcpp::List SgdObj_List);
+tuning ConvertTuningObj(Rcpp::List TuningObj_List);
 para ConvertPara(Rcpp::List Para_List);
 
 //UTILITY FUNCTIONS
-std::pair<para, sgdobj> UpdateOmega(arma::colvec const& grad, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para);
+para UpdatePara(datobj DatObj, para Para);
+std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatObj, tuning TuningObj, para Para);
 arma::colvec ComputeGradientPrior(datobj DatObj, hypara HyPara, para Para);
-arma::colvec ComputeGradienti(int id, arma::mat const& Gamma_i, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para);
-arma::mat SampleGamma(int id, datobj DatObj, hypara HyPara, sgdobj SgdObj, para Para);
+arma::colvec ComputeGradientI(int Id, arma::mat const& Gamma_i, datobj DatObj, tuning TuningObj, para Para);
+arma::mat SampleGamma(int id, datobj DatObj, tuning TuningObj, para Para);
 arma::colvec vecLT(arma::mat const& x);
-arma::mat GetL(arma::mat const& z, int q);
-arma::mat GetZ(arma::vec const& l, int q);
+arma::mat GetL(arma::mat const& Z, int Q);
+arma::mat GetZ(arma::vec const& l, int Q);
 arma::mat CholInv(arma::mat const& Cov);
 bool rows_equal(arma::mat const& lhs, arma::mat const& rhs, double tol);
-void UpdateBurnInBar(int e, sgdobj SgdObj);
-void UpdateBurnInBarInt(int e, sgdobj SgdObj);
-void BeginBurnInProgress(sgdobj SgdObj, bool Interactive);
+void UpdateMAPBar(int e, tuning TuningObj);
+void UpdateMAPBarInt(int e, tuning TuningObj);
+void BeginMAPProgress(tuning TuningObj, bool Interactive);
+void SamplerProgress(int e, tuning TuningObj);
 
 #endif // __glmmr__

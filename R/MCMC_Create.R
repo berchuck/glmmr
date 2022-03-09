@@ -1,24 +1,25 @@
-###Function for reading in sampler inputs and creating a list object that contains all relavent data objects--------------------
+###Function for reading in sampler inputs and creating a list object that contains all relevant data objects--------------------
 CreateDatObj <- function(pformula, gformula, group, data, family) {
 
   ###Data objects
   N <- nrow(data) # total observations
-  n <- length(unique(dat[, group])) #number of spatial locations
+  NUnits <- length(unique(dat[, group])) #number of spatial locations
+  data <- data[order(data[, group]), ]
   Y <- matrix(data[, all.vars(pformula)[1]], ncol = 1)
-  group <- data[, group] # group must be sorted or we have to sort it here.
+  Group <- data[, group]
 
   ###Covariates
   X <- model.matrix(pformula, data = data)
-  Z_temp <- model.matrix(gformula, data = data)
-  p <- ncol(X)
-  q <- ncol (Z_temp)
-  X <- matrix(X, nrow = N, ncol = p)
-  Z <- bdiag(lapply(split(Z_temp, group), function(x) matrix(x, ncol = q)))
-  Z <- matrix(Z, nrow = N, ncol = q * n)
-  group2 <- rep(1:n, each = q)
+  ZMat <- model.matrix(gformula, data = data)
+  P <- ncol(X)
+  Q <- ncol(ZMat)
+  X <- matrix(X, nrow = N, ncol = P)
+  Z <- bdiag(lapply(split(ZMat, Group), function(x) matrix(x, ncol = Q)))
+  Z <- matrix(Z, nrow = N, ncol = Q * NUnits)
+  Group2 <- rep(1:NUnits, each = Q)
     
   ###Matrix Objects
-  EyeQ <- diag(q)
+  EyeQ <- diag(Q)
   
   ###Family indicator
   FamilyInd <- -1
@@ -31,13 +32,13 @@ CreateDatObj <- function(pformula, gformula, group, data, family) {
   DatObj$Y <- Y
   DatObj$X <- X
   DatObj$Z <- Z
-  DatObj$group <- group
-  DatObj$group2 <- group2
+  DatObj$Group <- Group
+  DatObj$Group2 <- Group2
   DatObj$N <- N
-  DatObj$n <- n
-  DatObj$p <- p
-  DatObj$q <- q
-  DatObj$n_L <- choose(q, 2)
+  DatObj$NUnits <- NUnits
+  DatObj$P <- P
+  DatObj$Q <- Q
+  DatObj$NL <- choose(Q, 2)
   DatObj$FamilyInd <- FamilyInd
   DatObj$EyeQ <- EyeQ
   return(DatObj)
@@ -46,40 +47,29 @@ CreateDatObj <- function(pformula, gformula, group, data, family) {
 
 
 
-###Function to create Hyperparameter Object------------------------------------------------------------------------------------
-CreateHyPara <- function(hypers, DatObj) {
+###Function to create Hyper-parameter Object------------------------------------------------------------------------------------
+CreateHyPara <- function(hypers) {
 
-  ###Set data objects
-  # p <- DatObj$p
-  
   ###Which parameters are user defined?
   Userhypers <- names(hypers)
 
-  ###Set hyperparameters for Beta
-  # if ("Beta" %in% Userhypers) {
-  #   SigmaBeta <- hypers$Beta$SigmaBeta
-  # }
-  # if (!("Beta" %in% Userhypers)) {
-  #   SigmaBeta <- diag(p)
-  # }
-
-  ###Set hyperparameters for L
+  ###Set hyper-parameters for L
   if ("L" %in% Userhypers) {
-    Eta <- hypers$L$Eta
+    Eta <- hypers$l$Eta
   }
   if (!("L" %in% Userhypers)) {
     Eta <- 1
   }
   
-  ###Set hyperparameters for D
+  ###Set hyper-parameters for D
   if ("D" %in% Userhypers) {
-    Nu <- hypers$D$Nu
+    Nu <- hypers$d$Nu
   }
   if (!("D" %in% Userhypers)) {
     Nu <- 3
   }
 
-  ###Create object for hyperparameters
+  ###Create object for hyper-parameters
   HyPara <- list()
   HyPara$Eta <- Eta
   HyPara$Nu <- Nu
@@ -89,115 +79,123 @@ CreateHyPara <- function(hypers, DatObj) {
 
 
 
-###Function for creating an object containing relevant SGD information---------------------------------------------------
-CreateSgdObj <- function(sgd, DatObj) {
+###Function for creating an object containing relevant tuning information---------------------------------------------------
+CreateTuningObj <- function(tuning, DatObj) {
   
   ###Set data objects
-  p <- DatObj$p
-  q <- DatObj$q
-  n_L <- DatObj$n_L
-  n <- DatObj$n
+  P <- DatObj$P
+  Q <- DatObj$Q
+  NL <- DatObj$NL
+  NUnits <- DatObj$NUnits
   
   ###Which parameters are user defined?
-  UserSgds <- names(sgd)
+  UserTuning <- names(tuning)
   
-  ###Set Epsilon
-  if ("Epsilon" %in% UserSgds) Epsilon <- sgd$Epsilon
-  if (!("Epsilon" %in% UserSgds)) Epsilon <- 1e-8
+  ###Optimization
+  if ("EpsilonNADAM" %in% UserTuning) EpsilonNADAM <- tuning$EpsilonNADAM
+  if (!("EpsilonNADAM" %in% UserTuning)) EpsilonNADAM <- 1e-8
+  if ("MuNADAM" %in% UserTuning) MuNADAM <- tuning$MuNADAM
+  if (!("MuNADAM" %in% UserTuning)) MuNADAM <- 0.975
+  if ("AlphaNADAM" %in% UserTuning) AlphaNADAM <- tuning$AlphaNADAM
+  if (!("AlphaNADAM" %in% UserTuning)) AlphaNADAM <- 0.002
+  if ("NuNADAM" %in% UserTuning) NuNADAM <- tuning$NuNADAM
+  if (!("NuNADAM" %in% UserTuning)) NuNADAM <- 0.999
+  if ("S" %in% UserTuning) S <- tuning$S
+  if (!("S" %in% UserTuning)) S <- min(10, NUnits)
+  if ("NEpochs" %in% UserTuning) NEpochs <- tuning$NEpochs
+  if (!("NEpochs" %in% UserTuning)) NEpochs <- 1000
+  if ("R" %in% UserTuning) R <- tuning$R
+  if (!("R" %in% UserTuning)) R <- 500
   
-  ###Set Mu_nadam
-  if ("Mu_nadam" %in% UserSgds) Mu_nadam <- sgd$Mu_nadam
-  if (!("Mu_nadam" %in% UserSgds)) Mu_nadam <- 0.975
+  ###Sampling
+  if ("EpsilonSGLD" %in% UserTuning) EpsilonSGLD <- tuning$EpsilonSGLD
+  if (!("EpsilonSGLD" %in% UserTuning)) EpsilonSGLD <- 0.01
+  if ("NSims" %in% UserTuning) NSims <- tuning$NSims
+  if (!("NSims" %in% UserTuning)) NSims <- 5000
+  if ("NThin" %in% UserTuning) NThin <- tuning$NThin
+  if (!("NThin" %in% UserTuning)) NThin <- 1
   
-  ###Set Alpha_nadam
-  if ("Alpha_nadam" %in% UserSgds) Alpha_nadam <- sgd$Alpha_nadam
-  if (!("Alpha_nadam" %in% UserSgds)) Alpha_nadam <- 0.002
-  
-  ###Set Nu_nadam
-  if ("Nu_nadam" %in% UserSgds) Nu_nadam <- sgd$Nu_nadam
-  if (!("Nu_nadam" %in% UserSgds)) Nu_nadam <- 0.999
-  
-  ###Set S # size of the mini-batches 
-  if ("S" %in% UserSgds) S <- sgd$S
-  if (!("S" %in% UserSgds)) S <- round(n * 0.1)
-  
-  ###Set n_epochs
-  if ("n_epochs" %in% UserSgds) n_epochs <- sgd$n_epochs
-  if (!("n_epochs" %in% UserSgds)) n_epochs <- 50000
+  ###One last check of MCMC user inputs
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
+  if (!(is.wholenumber(NSims / NThin))) stop('tuning: "NThin" must be a factor of "NSims"')
 
-  ###Set R
-  if ("R" %in% UserSgds) R <- sgd$R
-  if (!("R" %in% UserSgds)) R <- 500
-  
   ###Burn-in progress bar
+  WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin
+  NKeep <- length(WhichKeep)
+  
   BarLength <- 50 #Burn-in bar length (arbitrary)
-  BurnInProgress <- seq(1 / BarLength, 1, 1 / BarLength)
-  WhichBurnInProgress <- sapply(BurnInProgress, function(x) tail(which(1 : n_epochs <= x * n_epochs), 1))
+  MAPProgress <- seq(1 / BarLength, 1, 1 / BarLength)
+  WhichMAPProgress <- sapply(MAPProgress, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1))
   SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
-  WhichBurnInProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:n_epochs <= x * n_epochs), 1))
+  WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1))
+  WhichSamplerProgress <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs
   
   ###Return SGD object
-  SgdObj <- list()
-  SgdObj$Epsilon <- Epsilon
-  SgdObj$M_nadam <- matrix(0, nrow = p + n_L + q)
-  SgdObj$N_nadam <- matrix(0, nrow = p + n_L + q)
-  SgdObj$Mu_nadam <- Mu_nadam
-  SgdObj$Alpha_nadam <- Alpha_nadam
-  SgdObj$Nu_nadam <- Nu_nadam
-  SgdObj$S <- S
-  SgdObj$n_epochs <- n_epochs
-  SgdObj$R <- R
-  SgdObj$BarLength <- BarLength
-  SgdObj$WhichBurnInProgress <- WhichBurnInProgress
-  SgdObj$WhichBurnInProgressInt <- WhichBurnInProgressInt
-  return(SgdObj)
+  TuningObj <- list()
+  TuningObj$EpsilonNADAM <- EpsilonNADAM
+  TuningObj$MuNADAM <- MuNADAM
+  TuningObj$AlphaNADAM <- AlphaNADAM
+  TuningObj$NuNADAM <- NuNADAM
+  TuningObj$MNADAM <- matrix(0, nrow = P + NL + Q)
+  TuningObj$NNADAM <- matrix(0, nrow = P + NL + Q)
+  TuningObj$S <- S
+  TuningObj$NEpochs <- NEpochs
+  TuningObj$R <- R
+  TuningObj$EpsilonSGLD <- EpsilonSGLD
+  TuningObj$NSims <- NSims
+  TuningObj$NThin <- NThin
+  TuningObj$NTotal <- NSims + NEpochs
+  TuningObj$WhichKeep <- WhichKeep
+  TuningObj$NKeep <- NKeep
+  TuningObj$BarLength <- BarLength
+  TuningObj$WhichMAPProgress <- WhichMAPProgress
+  TuningObj$WhichMAPProgressInt <- WhichMAPProgressInt
+  TuningObj$WhichSamplerProgress <- WhichSamplerProgress
+  return(TuningObj)
   
 }
 
 
 
 ###Function for creating initial parameter object-------------------------------------------------------------------------------
-CreatePara <- function(starting, DatObj, HyPara) {
+CreatePara <- function(starting, DatObj) {
 
   ###Set data objects
-  p <- DatObj$p
-  q <- DatObj$q
-  n_L <- DatObj$n_L
-
-  ###Set hyperparameter objects
-  Eta <- HyPara$Eta
-  Nu <- HyPara$Nu
+  P <- DatObj$P
+  Q <- DatObj$Q
+  NL <- DatObj$NL
+  EyeQ <- DatObj$EyeQ
 
   ###Which parameters are user defined?
   UserStarters <- names(starting)
 
   ###Set initial values of Beta
-  if ("Beta" %in% UserStarters) Beta <- matrix(starting$Beta, nrow = p, ncol = 1)
-  if ((!"Beta" %in% UserStarters)) Beta <- matrix(rnorm(p), nrow = p, ncol = 1)
-  
+  if ("Beta" %in% UserStarters) Beta <- matrix(starting$Beta, nrow = P, ncol = 1)
+  if ((!"Beta" %in% UserStarters)) Beta <- matrix(rnorm(P), nrow = P, ncol = 1)
+
   ###Set initial values of l
-  if ("l" %in% UserStarters) l <- matrix(starting$l, nrow = n_L, ncol = 1)
-  if ((!"l" %in% UserStarters)) l <- matrix(rnorm(n_L), nrow = n_L, ncol = 1)
+  if ("l" %in% UserStarters) l <- matrix(starting$l, nrow = NL, ncol = 1)
+  if ((!"l" %in% UserStarters)) l <- matrix(rnorm(NL), nrow = NL, ncol = 1)
   
   ###Set initial values of d
-  if ("d" %in% UserStarters) d <- matrix(starting$d, nrow = q, ncol = 1)
-  if ((!"d" %in% UserStarters)) d <- matrix(rnorm(q), nrow = q, ncol = 1)
+  if ("d" %in% UserStarters) d <- matrix(starting$d, nrow = Q, ncol = 1)
+  if ((!"d" %in% UserStarters)) d <- matrix(rnorm(Q), nrow = Q, ncol = 1)
   
   ###Functions of parameters
-  z <- GetZ(l, q)
-  L <- GetL(z, q)
-  Loverz <- vecLT(L / z)
+  Z <- GetZ(l, Q)
+  L <- GetL(Z, Q)
+  LoverZ <- vecLT(L / Z)
   D <- diag(exp(as.numeric(d)))
   Upsilon <- L %*% t(L)
   Sigma <- D %*% Upsilon %*% D
-  LInv <- forwardsolve(l = L, x = diag(ncol(L)))
+  LInv <- forwardsolve(l = L, x = EyeQ)
   tLInv <- t(LInv)
   UpsilonInv <- tLInv %*% LInv
   DInv <- diag(1 / diag(D))
   SigmaInv <- DInv %*% UpsilonInv %*% DInv
-  gradLz <- diag(as.numeric(Loverz), nrow = n_L, ncol = n_L)
-  gradzl <- diag(as.numeric(1 / cosh(l)^2), nrow = n_L, ncol = n_L)
-  gradLl <- gradLz %*% gradzl
+  GradLZ <- diag(as.numeric(LoverZ), nrow = NL, ncol = NL)
+  GradZl <- diag(as.numeric(1 / cosh(l)^2), nrow = NL, ncol = NL)
+  GradLl <- GradLZ %*% GradZl
   
   ###Save parameter objects
   Para <- list()
@@ -205,9 +203,9 @@ CreatePara <- function(starting, DatObj, HyPara) {
   Para$l <- l
   Para$d <- d
   Para$Omega <- rbind(Beta, l, d)
-  Para$z <- z
+  Para$Z <- Z
   Para$L <- L
-  Para$Loverz <- Loverz
+  Para$LoverZ <- LoverZ
   Para$D <- D
   Para$Upsilon <- Upsilon
   Para$Sigma <- Sigma
@@ -216,9 +214,9 @@ CreatePara <- function(starting, DatObj, HyPara) {
   Para$UpsilonInv <- UpsilonInv
   Para$DInv <- DInv
   Para$SigmaInv <- SigmaInv
-  Para$gradLz <- gradLz
-  Para$gradzl <- gradzl
-  Para$gradLl <- gradLl
+  Para$GradLZ <- GradLZ
+  Para$GradZl <- GradZl
+  Para$GradLl <- GradLl
   return(Para)
 
 }

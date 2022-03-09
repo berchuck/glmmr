@@ -8,36 +8,36 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   arma::colvec Y = DatObj_List["Y"];
   arma::mat X = DatObj_List["X"];
   arma::mat Z = DatObj_List["Z"];
-  arma::Col<int> group = DatObj_List["group"];
-  arma::Col<int> group2 = DatObj_List["group2"];
+  arma::Col<int> Group = DatObj_List["Group"];
+  arma::Col<int> Group2 = DatObj_List["Group2"];
   int N = DatObj_List["N"];
-  int n = DatObj_List["n"];
-  int p = DatObj_List["p"];
-  int q = DatObj_List["q"];
-  int n_L = DatObj_List["n_L"];
+  int NUnits = DatObj_List["NUnits"];
+  int P = DatObj_List["P"];
+  int Q = DatObj_List["Q"];
+  int NL = DatObj_List["NL"];
   int FamilyInd = DatObj_List["FamilyInd"];
   arma::mat EyeQ = DatObj_List["EyeQ"];
-  arma::Col<int> Seqn = arma::linspace<arma::Col<int>>(1, n, n);
-  arma::colvec Probn = arma::ones<arma::colvec>(n) / n;
-  int n_omega = p + q + n_L;
+  arma::Col<int> SeqNUnits = arma::linspace<arma::Col<int>>(1, NUnits, NUnits);
+  arma::colvec ProbNUnits = arma::ones<arma::colvec>(NUnits) / NUnits;
+  int NOmega = P + Q + NL;
   
   //Convert to C++ struct
   datobj DatObj;
   DatObj.Y = Y;
   DatObj.X = X;
   DatObj.Z = Z;
-  DatObj.group = group;
-  DatObj.group2 = group2;
+  DatObj.Group = Group;
+  DatObj.Group2 = Group2;
   DatObj.N = N;
-  DatObj.n = n;
-  DatObj.p = p;
-  DatObj.q = q;
-  DatObj.n_L = n_L;
+  DatObj.NUnits = NUnits;
+  DatObj.P = P;
+  DatObj.Q = Q;
+  DatObj.NL = NL;
   DatObj.FamilyInd = FamilyInd;
   DatObj.EyeQ = EyeQ;
-  DatObj.Seqn = Seqn;
-  DatObj.Probn = Probn;
-  DatObj.n_omega = n_omega;
+  DatObj.SeqNUnits = SeqNUnits;
+  DatObj.ProbNUnits = ProbNUnits;
+  DatObj.NOmega = NOmega;
   return DatObj;
 
 }
@@ -61,38 +61,50 @@ hypara ConvertHyPara(Rcpp::List HyPara_List) {
 
 
   
-//Function to convert Rcpp::List SgdObj to a custom C++ struct sgdobj-----------------------------------------------
-sgdobj ConvertSgdObj(Rcpp::List SgdObj_List) {
+//Function to convert Rcpp::List TuningObj to a custom C++ struct tuning-----------------------------------------------
+tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   
   //Set objects from List
-  double Epsilon = SgdObj_List["Epsilon"];
-  arma::vec M_nadam = SgdObj_List["M_nadam"];
-  arma::vec N_nadam = SgdObj_List["N_nadam"];
-  double Mu_nadam = SgdObj_List["Mu_nadam"];
-  double Alpha_nadam = SgdObj_List["Alpha_nadam"];
-  double Nu_nadam = SgdObj_List["Nu_nadam"];
-  double S = SgdObj_List["S"];
-  double n_epochs = SgdObj_List["n_epochs"];
-  double R = SgdObj_List["R"];
-  int BarLength = SgdObj_List["BarLength"];
-  arma::vec WhichBurnInProgressInt = SgdObj_List["WhichBurnInProgressInt"];
-  arma::vec WhichBurnInProgress = SgdObj_List["WhichBurnInProgress"];
+  double EpsilonNADAM = TuningObj_List["EpsilonNADAM"];
+  double MuNADAM = TuningObj_List["MuNADAM"];
+  double AlphaNADAM = TuningObj_List["AlphaNADAM"];
+  double NuNADAM = TuningObj_List["NuNADAM"];
+  arma::vec MNADAM = TuningObj_List["MNADAM"];
+  arma::vec NNADAM = TuningObj_List["NNADAM"];
+  int S = TuningObj_List["S"];
+  int NEpochs = TuningObj_List["NEpochs"];
+  int R = TuningObj_List["R"];
+  double EpsilonSGLD = TuningObj_List["EpsilonSGLD"];
+  int NSims = TuningObj_List["NSims"];
+  int NKeep = TuningObj_List["NKeep"];
+  int NTotal = TuningObj_List["NTotal"];
+  int BarLength = TuningObj_List["BarLength"];
+  arma::vec WhichKeep = TuningObj_List["WhichKeep"];
+  arma::vec WhichMAPProgress = TuningObj_List["WhichMAPProgress"];
+  arma::vec WhichMAPProgressInt = TuningObj_List["WhichMAPProgressInt"];
+  arma::vec WhichSamplerProgress = TuningObj_List["WhichSamplerProgress"];
   
   //Convert to C++ struct
-  sgdobj SgdObj;
-  SgdObj.Epsilon = Epsilon;
-  SgdObj.M_nadam = M_nadam;
-  SgdObj.N_nadam = N_nadam;
-  SgdObj.Mu_nadam = Mu_nadam;
-  SgdObj.Alpha_nadam = Alpha_nadam;
-  SgdObj.Nu_nadam = Nu_nadam;
-  SgdObj.S = S;
-  SgdObj.n_epochs = n_epochs;
-  SgdObj.R = R;
-  SgdObj.BarLength = BarLength;
-  SgdObj.WhichBurnInProgressInt = WhichBurnInProgressInt;
-  SgdObj.WhichBurnInProgress = WhichBurnInProgress;
-  return SgdObj;
+  tuning TuningObj;
+  TuningObj.EpsilonNADAM = EpsilonNADAM;
+  TuningObj.MuNADAM = MuNADAM;
+  TuningObj.AlphaNADAM = AlphaNADAM;
+  TuningObj.NuNADAM = NuNADAM;
+  TuningObj.MNADAM = MNADAM;
+  TuningObj.NNADAM = NNADAM;
+  TuningObj.S = S;
+  TuningObj.NEpochs = NEpochs;
+  TuningObj.R = R;
+  TuningObj.EpsilonSGLD = EpsilonSGLD;
+  TuningObj.NSims = NSims;
+  TuningObj.NKeep = NKeep;
+  TuningObj.NTotal = NTotal;
+  TuningObj.BarLength = BarLength;
+  TuningObj.WhichKeep = WhichKeep;
+  TuningObj.WhichMAPProgress = WhichMAPProgress;
+  TuningObj.WhichMAPProgressInt = WhichMAPProgressInt;
+  TuningObj.WhichSamplerProgress = WhichSamplerProgress;
+  return TuningObj;
   
 }
 
@@ -106,9 +118,9 @@ para ConvertPara(Rcpp::List Para_List) {
   arma::colvec l = Para_List["l"];
   arma::colvec d = Para_List["d"];
   arma::colvec Omega = Para_List["Omega"];
-  arma::mat z = Para_List["z"];
+  arma::mat Z = Para_List["Z"];
   arma::mat L = Para_List["L"];
-  arma::vec Loverz = Para_List["Loverz"];
+  arma::vec LoverZ = Para_List["LoverZ"];
   arma::mat D = Para_List["D"];
   arma::mat Upsilon = Para_List["Upsilon"];
   arma::mat Sigma = Para_List["Sigma"];
@@ -117,9 +129,9 @@ para ConvertPara(Rcpp::List Para_List) {
   arma::mat UpsilonInv = Para_List["UpsilonInv"];
   arma::mat DInv = Para_List["DInv"];
   arma::mat SigmaInv = Para_List["SigmaInv"];
-  arma::mat gradLz = Para_List["gradLz"];
-  arma::mat gradzl = Para_List["gradzl"];
-  arma::mat gradLl = Para_List["gradLl"];
+  arma::mat GradLZ = Para_List["GradLZ"];
+  arma::mat GradZl = Para_List["GradZl"];
+  arma::mat GradLl = Para_List["GradLl"];
     
   //Convert to C++ struct
   para Para;
@@ -127,9 +139,9 @@ para ConvertPara(Rcpp::List Para_List) {
   Para.l = l;
   Para.d = d;
   Para.Omega = Omega;
-  Para.z = z;
+  Para.Z = Z;
   Para.L = L;
-  Para.Loverz = Loverz;
+  Para.LoverZ = LoverZ;
   Para.D = D;
   Para.Upsilon = Upsilon;
   Para.Sigma = Sigma;
@@ -138,8 +150,8 @@ para ConvertPara(Rcpp::List Para_List) {
   Para.UpsilonInv = UpsilonInv;
   Para.DInv = DInv;
   Para.SigmaInv = SigmaInv;
-  Para.gradLz = gradLz;
-  Para.gradzl = gradzl;
-  Para.gradLl = gradLl;
+  Para.GradLZ = GradLZ;
+  Para.GradZl = GradZl;
+  Para.GradLl = GradLl;
   return Para;
 }
