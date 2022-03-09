@@ -121,12 +121,12 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   # gformula = ~ 1 + time
   # group = "id"
   # data = dat
-  # family = "binomial"
+  # family = "bernoulli"
   # starting = NULL
   # hypers = NULL
   # tuning = list(NSims = 1000, NEpochs = 1000, S = 1)
   # seed = 54
-  
+
   ###Check for missing objects
   if (missing(pformula)) stop("pformula: missing")
   if (missing(gformula)) stop("gformula: missing")
@@ -134,7 +134,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   if (missing(data)) stop("data: missing")
 
   ###Check model inputs
-  # CheckInputs(formula, data, family, starting, hypers, tuning, mcmc, seed)
+  CheckInputs(pformula, gformula, group, data, family, starting, hypers, tuning, seed)
 
   ####Set seed for reproducibility
   set.seed(seed)
