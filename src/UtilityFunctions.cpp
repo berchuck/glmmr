@@ -1,6 +1,126 @@
 #include <RcppArmadillo.h>
 #include "MCMC_glmmr.h"
 
+//Function to compute the SGLD correction
+para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive) {
+  
+  //Set data objects
+  int NUnits = DatObj.NUnits;
+  int NOmega = DatObj.NOmega;
+  
+  //Set tuning objects
+  arma::vec WhichSGLDProgress = TuningObj.WhichSGLDProgress;
+  arma::vec WhichSGLDProgressInt = TuningObj.WhichSGLDProgressInt;
+  
+  //User output
+  BeginSGLDProgress(TuningObj, Interactive);
+  
+  //Initialize objects
+  arma::mat SigmaSum(NOmega, NOmega, arma::fill::zeros);
+
+  //Loop over all units
+  for (arma::uword i = 1; i < (NUnits + 1); i++) {
+    SigmaSum += ComputeSigmaHatI(i, DatObj, TuningObj, Para);
+    if (Interactive) if (std::find(WhichSGLDProgress.begin(), WhichSGLDProgress.end(), i) != WhichSGLDProgress.end())
+      UpdateSGLDBar(i, TuningObj);
+    if (!Interactive) if (std::find(WhichSGLDProgressInt.begin(), WhichSGLDProgressInt.end(), i) != WhichSGLDProgressInt.end())
+      UpdateSGLDBarInt(i, TuningObj);
+  }
+  Para.SigmaPrime = arma::chol(SigmaSum) / sqrt(NUnits);
+  return Para;
+  
+}
+
+
+
+//Function to compute Monte Carlo variance for unit i
+arma::mat ComputeSigmaHatI(int Id, datobj DatObj, tuning TuningObj, para Para) {
+  
+  //Begin by computing gamma and mu hat for subject i
+  arma::mat GammaI = SampleGamma(Id, DatObj, TuningObj, Para);
+  arma::colvec MuHatI = ComputeGradientI(Id, GammaI, DatObj, TuningObj, Para);
+  
+  //Set data objects
+  int P = DatObj.P;
+  int Q = DatObj.Q;
+  int NL = DatObj.NL;
+  int NOmega = DatObj.NOmega;
+  arma::colvec Y = DatObj.Y;
+  arma::mat X = DatObj.X;
+  arma::mat Z = DatObj.Z;
+  arma::Col<int> Group = DatObj.Group;
+  arma::Col<int> Group2 = DatObj.Group2;
+  
+  //Set tuning objects
+  int R = TuningObj.R;
+  
+  //Set parameters
+  arma::colvec Beta = Para.Beta;
+  arma::mat DInv = Para.DInv;
+  arma::mat LInv = Para.LInv;
+  arma::mat GradLl = Para.GradLl;
+  arma::mat L = Para.L;
+  arma::mat UpsilonInv = Para.UpsilonInv;
+  arma::colvec d = Para.d;
+  
+  //Prepare data
+  arma::uvec indeces_row = arma::find(Group == Id);
+  arma::uvec indeces_col = arma::find(Group2 == Id);
+  arma::mat x_i = X.rows(indeces_row);
+  arma::colvec x_i_beta = x_i * Beta;
+  arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  arma::colvec y_i = Y(indeces_row);
+  
+  //Compute GLMM mean parameter
+  arma::mat theta_i = arma::repmat(x_i_beta, 1, R) + z_i * GammaI;
+  arma::mat fit_i = arma::exp(theta_i);
+  bool any_inf = fit_i.has_inf();
+  arma::mat pi_i = fit_i / (1 + fit_i);
+  if (any_inf) {
+    arma::uvec where_inf = arma::find_nonfinite(fit_i); 
+    for (arma::uword i = 0; i < where_inf.size(); i++) {
+      arma::uword index = where_inf(i);
+      if (fit_i(index) == arma::datum::inf) pi_i(index) = 1;
+      if (fit_i(index) == -arma::datum::inf) pi_i(index) = 0;
+    }
+  }
+  
+  //Initialize objects
+  arma::colvec grad_beta_likelihood(P, arma::fill::zeros);
+  arma::colvec grad_L_likelihood(NL, arma::fill::zeros); 
+  arma::colvec grad_D_likelihood(Q, arma::fill::zeros); 
+  arma::colvec grad_re_d(Q, arma::fill::zeros);
+  arma::colvec grad_Omega_r;
+  arma::mat SigmaHatOmega(NOmega, NOmega, arma::fill::zeros);
+  
+  //Compute gradients by looping over R
+  for (arma::uword r = 1; r < R; r++) {
+    arma::colvec gamma_ir = GammaI.col(r);
+    grad_beta_likelihood = arma::trans(arma::trans(y_i - pi_i.col(r)) * x_i);
+    arma::colvec v = DInv * gamma_ir;
+    arma::colvec w = LInv * v;
+    grad_L_likelihood = (get_grad_1_L(L, Q) - arma::trans(w) * get_grad_w_L(L, v, w, NL, Q)) * GradLl;
+    arma::mat Gamma_r = arma::diagmat(gamma_ir);
+    arma::mat M = Gamma_r * UpsilonInv * Gamma_r;
+    for (arma::uword k = 0; k < Q; k++) {
+      double sum1 = 0;
+      for (arma::uword h = 0; h < Q; h++) sum1 += M(h, k) * exp(-d(h));
+      grad_re_d(k) = -1 + exp(-d(k)) * sum1;
+    }
+    grad_D_likelihood = grad_re_d;
+    grad_Omega_r = arma::join_cols(grad_beta_likelihood, grad_L_likelihood, grad_D_likelihood);
+    SigmaHatOmega += (grad_Omega_r - MuHatI) * arma::trans(grad_Omega_r - MuHatI);
+  }
+  
+  //Final likelihood contribution
+  SigmaHatOmega /= ((R - 1) * (R - 1));
+  return SigmaHatOmega;
+  
+//End function to compute variance of the Monte Carlo integral       
+} 
+
+
+
 //Function to update parameters using NADAM
 para UpdatePara(datobj DatObj, para Para) {
   
@@ -18,20 +138,31 @@ para UpdatePara(datobj DatObj, para Para) {
   arma::colvec l = Omega(arma::span(P, P + NL - 1));
   arma::colvec d = Omega(arma::span(P + NL, P + NL + Q - 1));
   
+  //Update L
+  arma::mat Z = GetZ(l, Q);
+  arma::mat L = GetL(Z, Q);
+  // Rcpp::Rcout << std::fixed << L.diag() << arma::zeros(Q) << std::endl;
+  bool close_to_singular = any(L.diag() == 0);
+  // bool close_to_singular = approx_equal(L.diag(), arma::zeros(Q), "absdiff", 0.0001);
+  if (close_to_singular) Rcpp::stop("L is almost singular. Consider decreasing EpsilonSGLD.");
+  arma::mat LInv(Q, Q);
+  bool not_singular = arma::solve(LInv, arma::trimatl(L), EyeQ);
+  if (!not_singular) Rcpp::stop("L is singular. Decrease EpsilonSGLD.");
+  
   //Save parameters
   Para.Omega = Omega;
   Para.Beta = Beta;
   Para.l = l;
   Para.d = d;
-  Para.Z = GetZ(l, Q);
-  Para.L = GetL(Para.Z, Q);
-  Para.LoverZ = vecLT(Para.L / Para.Z);
+  Para.Z = Z;
+  Para.L = L;
+  Para.LoverZ = vecLT(L / Z);
   Para.D = arma::diagmat(arma::exp(d));
-  Para.Upsilon = Para.L * arma::trans(Para.L);
+  Para.Upsilon = L * arma::trans(L);
   Para.Sigma = Para.D * Para.Upsilon * Para.D;
-  Para.LInv = arma::solve(arma::trimatl(Para.L), EyeQ);
-  Para.tLInv = arma::trans(Para.LInv);
-  Para.UpsilonInv = Para.tLInv * Para.LInv;
+  Para.LInv = LInv;
+  Para.tLInv = arma::trans(LInv);
+  Para.UpsilonInv = Para.tLInv * LInv;
   Para.DInv = arma::diagmat(arma::exp(-d));
   Para.SigmaInv = Para.DInv * Para.UpsilonInv * Para.DInv;
   Para.GradLZ = arma::diagmat(Para.LoverZ);
@@ -50,7 +181,9 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   
   //Set data objects
   int NOmega = DatObj.NOmega;
-
+  int AlgorithmInd = DatObj.AlgorithmInd;
+  arma::mat EyeNOmega = DatObj.EyeNOmega;
+  
   //Set tuning objects
   double EpsilonNADAM = TuningObj.EpsilonNADAM;
   double MuNADAM = TuningObj.MuNADAM;
@@ -76,17 +209,25 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
     }
   }
   
-  //Update omega using SGLD
-  if (e > NEpochs) {
-    Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD)));
+  //Update omega using SGLD with or without the correction
+  if (AlgorithmInd > 0) {
+    if (e > NEpochs) {
+      if (AlgorithmInd == 1) Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
+      if (AlgorithmInd == 2) {
+        arma::mat SigmaPrime = Para.SigmaPrime;
+        arma::mat Sigma = sqrt(2) * EyeNOmega - sqrt(EpsilonSGLD) * SigmaPrime;
+        Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), EpsilonSGLD * Sigma * Sigma.t());
+      }
+    }
   }
-  
   //Update parameter object
   Para.Omega = Omega;
   
   //Update tuning object
-  TuningObj.MNADAM = MNADAM;
-  TuningObj.NNADAM = NNADAM;
+  if (e < (NEpochs + 1)) {
+    TuningObj.MNADAM = MNADAM;
+    TuningObj.NNADAM = NNADAM;
+  }
   
   //Return updated Omega
   return std::pair<para, tuning>(Para, TuningObj);
@@ -295,6 +436,8 @@ arma::colvec ComputeGradientI(int Id, arma::mat const& GammaI, datobj DatObj, tu
 //End function to compute gradient component       
 } 
 
+
+
 //Function to sample random effects
 arma::mat SampleGamma(int Id, datobj DatObj, tuning TuningObj, para Para) {
 
@@ -334,13 +477,17 @@ arma::mat SampleGamma(int Id, datobj DatObj, tuning TuningObj, para Para) {
     //Compute moments
     arma::mat D_omega_i = arma::diagmat(omega_i);
     arma::mat tz_i_D_omega_i = arma::trans(z_i) * D_omega_i;
-    arma::mat cov_gamma = CholInv(tz_i_D_omega_i * z_i + SigmaInv);
+    // arma::mat cov_gamma = CholInv(tz_i_D_omega_i * z_i + SigmaInv);
+    arma::mat cov_gamma(Q, Q);
+    bool not_singular = arma::inv_sympd(cov_gamma, tz_i_D_omega_i * z_i + SigmaInv);
+    if (!not_singular) Rcpp::stop("Gamma covariance singular");
     arma::colvec ystar = ((y_i - 0.5) / omega_i);
     arma::colvec mean_gamma = cov_gamma * (tz_i_D_omega_i * (ystar - x_i_beta));
     
     //Sample gamma
-    Gamma.col(r) = rmvnormRcpp(1, mean_gamma, cov_gamma);
-  
+    // Gamma.col(r) = rmvnormRcpp(1, mean_gamma, cov_gamma);
+    Gamma.col(r) = rmvnormRcppRobust(mean_gamma, cov_gamma);
+    
   //End loop over R  
   }
   

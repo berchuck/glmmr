@@ -15,6 +15,9 @@
 #' @param family Character string indicating the distribution of the observed data. Options
 #'  include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.
 #'  
+#' @param algorithm Character string indicating the algorithm to be used. Options
+#'  include: \code{"sgd"}, \code{"sgld"}, and \code{"sgld_corrected"}.
+#'  
 #' @param starting Either \code{NULL} or a \code{list} containing starting values
 #'  to be specified for the MCMC sampler. If \code{NULL} is not chosen then none, some or all
 #'  of the starting values may be specified.
@@ -51,7 +54,7 @@
 #'  
 #'  \code{NuNADAM}: Nu value in the NADAM algorithm. (default = 0.999)
 #'  
-#'  \code{S}: The size of the mini-batches. (default = 10% of the number of groups or 10, whichever is smaller)
+#'  \code{S}: The size of the mini-batches. (default = 10 percent of the groups or 10, whichever is smaller)
 #'  
 #'  \code{NEpochs}: The number of epochs in the NADAM phase. (default =
 #'  \code{1,000})
@@ -73,7 +76,8 @@
 #' @details Details of the underlying statistical model proposed by
 #'  Berchuck et al. 2019. are forthcoming.
 #'
-#' @return \code{glmmr} returns a list containing the following objects
+#' @return \code{glmmr} returns a list containing the following objects. Note that 
+#' if the sgd algorithm was used the output are not samples, but represent the path to the MAP.
 #'
 #'   \describe{
 #'
@@ -90,6 +94,8 @@
 #'   \item{\code{sigma}}{\code{NKeep x NL + Q} \code{matrix} of posterior samples for the covariance matrix \code{sigma}. The
 #'   columns have names that describe the samples within them. The row is listed first, e.g.,
 #'   \code{sigma32} refers to the entry in row \code{3}, column \code{2}.}
+#'
+#'   \item{\code{map}}{A \code{vector} containing the maximum a posteriori estimate.}
 #'
 #'   \item{\code{runtime}}{A \code{character} string giving the runtime of the MCMC sampler.}
 #'
@@ -113,7 +119,7 @@
 # @author Samuel I. Berchuck
 #' @references Reference for Berchuck et al. 2022 is forthcoming.
 #' @export
-glmmr <- function(pformula, gformula, group, data, family = "binomial", 
+glmmr <- function(pformula, gformula, group, data, family = "binomial", algorithm = "sgld_corrected",
                   starting = NULL, hypers = NULL, tuning = NULL, seed = 54) {
   
   ###Function Inputs
@@ -122,6 +128,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   # group = "id"
   # data = dat
   # family = "bernoulli"
+  # algorithm = "sgd"
   # starting = NULL
   # hypers = NULL
   # tuning = list(NSims = 1000, NEpochs = 1000, S = 1)
@@ -134,7 +141,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   if (missing(data)) stop("data: missing")
 
   ###Check model inputs
-  CheckInputs(pformula, gformula, group, data, family, starting, hypers, tuning, seed)
+  CheckInputs(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed)
 
   ####Set seed for reproducibility
   set.seed(seed)
@@ -143,7 +150,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   Interactive <- interactive()
 
   ###Create objects for use in sampler
-  DatObj <- CreateDatObj(pformula, gformula, group, data, family)
+  DatObj <- CreateDatObj(pformula, gformula, group, data, family, algorithm)
   HyPara <- CreateHyPara(hypers) 
   TuningObj <- CreateTuningObj(tuning, DatObj)
   Para <- CreatePara(starting, DatObj)
@@ -154,17 +161,17 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
   ###Run SGD in Rcpp to obtain MAP
   RegObj <- glmmr_Rcpp(DatObj, HyPara, TuningObj, Para, Interactive)
 
-  ###Set regression objects
-  OmegaMap <- RegObj$map
-  OmegaSamples <- RegObj$samples
-
   ###End time
   FinishTime <- Sys.time()
   RunTime <- FinishTime - BeginTime
 
+  ###Set regression objects
+  OmegaMAP <- RegObj$map
+  Omega <- RegObj$samples
+  
   ###Collect output to be returned
   DatObjOut <- OutputDatObj(DatObj)
-  Samples <- FormatSamples(DatObj, OmegaSamples)
+  Samples <- FormatSamples(DatObj, Omega)
 
   ###Return spBFA object
   glmmr <- list(beta = Samples$Beta,
@@ -172,6 +179,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial",
                 d = Samples$d,
                 upsilon = Samples$Upsilon,
                 sigma = Samples$Sigma,
+                map = OmegaMAP,
                 datobj = DatObjOut,
                 runtime = paste0("Model runtime: ", round(RunTime, 2), " ", attr(RunTime, "units")))
   glmmr <- structure(glmmr, class = "glmmr")

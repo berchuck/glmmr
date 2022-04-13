@@ -11,6 +11,7 @@ glmmr(
   group,
   data,
   family = "binomial",
+  algorithm = "sgld_corrected",
   starting = NULL,
   hypers = NULL,
   tuning = NULL,
@@ -30,6 +31,9 @@ must indicate the covariates to be included in the mixed effects.}
 
 \item{family}{Character string indicating the distribution of the observed data. Options
 include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.}
+
+\item{algorithm}{Character string indicating the algorithm to be used. Options
+include: \code{"sgd"}, \code{"sgld"}, and \code{"sgld_corrected"}.}
 
 \item{starting}{Either \code{NULL} or a \code{list} containing starting values
  to be specified for the MCMC sampler. If \code{NULL} is not chosen then none, some or all
@@ -67,7 +71,7 @@ include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.}
  
  \code{NuNADAM}: Nu value in the NADAM algorithm. (default = 0.999)
  
- \code{S}: The size of the mini-batches. (default = 10% of the number of groups or 10, whichever is smaller)
+ \code{S}: The size of the mini-batches. (default = 10 percent of the groups or 10, whichever is smaller)
  
  \code{NEpochs}: The number of epochs in the NADAM phase. (default =
  \code{1,000})
@@ -87,7 +91,8 @@ include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.}
 (default = 54).}
 }
 \value{
-\code{glmmr} returns a list containing the following objects
+\code{glmmr} returns a list containing the following objects. Note that 
+if the sgd algorithm was used the output are not samples, but represent the path to the MAP.
 
   \describe{
 
@@ -104,6 +109,8 @@ include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.}
   \item{\code{sigma}}{\code{NKeep x NL + Q} \code{matrix} of posterior samples for the covariance matrix \code{sigma}. The
   columns have names that describe the samples within them. The row is listed first, e.g.,
   \code{sigma32} refers to the entry in row \code{3}, column \code{2}.}
+
+  \item{\code{map}}{A \code{vector} containing the maximum a posteriori estimate.}
 
   \item{\code{runtime}}{A \code{character} string giving the runtime of the MCMC sampler.}
 

@@ -1,12 +1,16 @@
 ###Function for reading in sampler inputs and creating a list object that contains all relevant data objects--------------------
-CreateDatObj <- function(pformula, gformula, group, data, family) {
+CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
 
+  ###Extract group and convert to ordered integers
+  dat_group <- dat[, group]
+  dat_group <- as.numeric(as.factor(dat_group))
+  
   ###Data objects
   N <- nrow(data) # total observations
-  NUnits <- length(unique(dat[, group])) #number of spatial locations
-  data <- data[order(data[, group]), ]
+  NUnits <- length(unique(dat_group)) #number of spatial locations
+  data <- data[order(dat_group), ]
   Y <- matrix(data[, all.vars(pformula)[1]], ncol = 1)
-  Group <- data[, group]
+  Group <- dat_group
 
   ###Covariates
   X <- model.matrix(pformula, data = data)
@@ -17,15 +21,24 @@ CreateDatObj <- function(pformula, gformula, group, data, family) {
   Z <- bdiag(lapply(split(ZMat, Group), function(x) matrix(x, ncol = Q)))
   Z <- matrix(Z, nrow = N, ncol = Q * NUnits)
   Group2 <- rep(1:NUnits, each = Q)
-    
+  NL <- choose(Q, 2)
+  NOmega <- P + NL + Q
+  
   ###Matrix Objects
   EyeQ <- diag(Q)
+  EyeNOmega <- diag(NOmega)
   
   ###Family indicator
   FamilyInd <- -1
   if (family == "normal") FamilyInd <- 0
-  if (family == "binomial") FamilyInd <- 1
+  if (family == "bernoulli") FamilyInd <- 1
   if (family == "poisson") FamilyInd <- 2
+  
+  ###Algorithm indicator
+  AlgorithmInd <- -1
+  if (algorithm == "sgd") AlgorithmInd <- 0
+  if (algorithm == "sgld") AlgorithmInd <- 1
+  if (algorithm == "sgld_corrected") AlgorithmInd <- 2
   
   ###Make parameters global
   DatObj <- list()
@@ -35,12 +48,15 @@ CreateDatObj <- function(pformula, gformula, group, data, family) {
   DatObj$Group <- Group
   DatObj$Group2 <- Group2
   DatObj$N <- N
+  DatObj$NOmega <- NOmega
   DatObj$NUnits <- NUnits
   DatObj$P <- P
   DatObj$Q <- Q
-  DatObj$NL <- choose(Q, 2)
+  DatObj$NL <- NL
   DatObj$FamilyInd <- FamilyInd
+  DatObj$AlgorithmInd <- AlgorithmInd
   DatObj$EyeQ <- EyeQ
+  DatObj$EyeNOmega <- EyeNOmega
   return(DatObj)
 
 }
@@ -87,6 +103,7 @@ CreateTuningObj <- function(tuning, DatObj) {
   Q <- DatObj$Q
   NL <- DatObj$NL
   NUnits <- DatObj$NUnits
+  AlgorithmInd <- DatObj$AlgorithmInd
   
   ###Which parameters are user defined?
   UserTuning <- names(tuning)
@@ -122,13 +139,17 @@ CreateTuningObj <- function(tuning, DatObj) {
   ###Burn-in progress bar
   WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin
   NKeep <- length(WhichKeep)
-  
   BarLength <- 50 #Burn-in bar length (arbitrary)
-  MAPProgress <- seq(1 / BarLength, 1, 1 / BarLength)
-  WhichMAPProgress <- sapply(MAPProgress, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1))
+  ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
   SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
+  WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1))
+  WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : NUnits <= x * NUnits), 1))
+  WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs
   WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1))
-  WhichSamplerProgress <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs
+  WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NUnits <= x * NUnits), 1))
+  WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs
+  if (AlgorithmInd == 0) NSims <- 0
+  if (AlgorithmInd == 0) NKeep <- NEpochs
   
   ###Return SGD object
   TuningObj <- list()
@@ -151,6 +172,9 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$WhichMAPProgress <- WhichMAPProgress
   TuningObj$WhichMAPProgressInt <- WhichMAPProgressInt
   TuningObj$WhichSamplerProgress <- WhichSamplerProgress
+  TuningObj$WhichSamplerProgressInt <- WhichSamplerProgressInt
+  TuningObj$WhichSGLDProgress <- WhichSGLDProgress
+  TuningObj$WhichSGLDProgressInt <- WhichSGLDProgressInt
   return(TuningObj)
   
 }
@@ -164,6 +188,7 @@ CreatePara <- function(starting, DatObj) {
   P <- DatObj$P
   Q <- DatObj$Q
   NL <- DatObj$NL
+  NOmega <- DatObj$NOmega
   EyeQ <- DatObj$EyeQ
 
   ###Which parameters are user defined?
@@ -217,6 +242,7 @@ CreatePara <- function(starting, DatObj) {
   Para$GradLZ <- GradLZ
   Para$GradZl <- GradZl
   Para$GradLl <- GradLl
+  Para$SigmaPrime <- matrix(0, nrow = NOmega, ncol = NOmega)
   return(Para)
 
 }

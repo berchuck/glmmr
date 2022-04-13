@@ -11,16 +11,18 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   arma::Col<int> Group = DatObj_List["Group"];
   arma::Col<int> Group2 = DatObj_List["Group2"];
   int N = DatObj_List["N"];
+  int NOmega = DatObj_List["NOmega"];
   int NUnits = DatObj_List["NUnits"];
   int P = DatObj_List["P"];
   int Q = DatObj_List["Q"];
   int NL = DatObj_List["NL"];
   int FamilyInd = DatObj_List["FamilyInd"];
+  int AlgorithmInd = DatObj_List["AlgorithmInd"];
   arma::mat EyeQ = DatObj_List["EyeQ"];
+  arma::mat EyeNOmega = DatObj_List["EyeNOmega"];
   arma::Col<int> SeqNUnits = arma::linspace<arma::Col<int>>(1, NUnits, NUnits);
   arma::colvec ProbNUnits = arma::ones<arma::colvec>(NUnits) / NUnits;
-  int NOmega = P + Q + NL;
-  
+
   //Convert to C++ struct
   datobj DatObj;
   DatObj.Y = Y;
@@ -34,7 +36,9 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   DatObj.Q = Q;
   DatObj.NL = NL;
   DatObj.FamilyInd = FamilyInd;
+  DatObj.AlgorithmInd = AlgorithmInd;
   DatObj.EyeQ = EyeQ;
+  DatObj.EyeNOmega = EyeNOmega;
   DatObj.SeqNUnits = SeqNUnits;
   DatObj.ProbNUnits = ProbNUnits;
   DatObj.NOmega = NOmega;
@@ -83,6 +87,9 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   arma::vec WhichMAPProgress = TuningObj_List["WhichMAPProgress"];
   arma::vec WhichMAPProgressInt = TuningObj_List["WhichMAPProgressInt"];
   arma::vec WhichSamplerProgress = TuningObj_List["WhichSamplerProgress"];
+  arma::vec WhichSamplerProgressInt = TuningObj_List["WhichSamplerProgressInt"];
+  arma::vec WhichSGLDProgress = TuningObj_List["WhichSGLDProgress"];
+  arma::vec WhichSGLDProgressInt = TuningObj_List["WhichSGLDProgressInt"];
   
   //Convert to C++ struct
   tuning TuningObj;
@@ -104,6 +111,9 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.WhichMAPProgress = WhichMAPProgress;
   TuningObj.WhichMAPProgressInt = WhichMAPProgressInt;
   TuningObj.WhichSamplerProgress = WhichSamplerProgress;
+  TuningObj.WhichSamplerProgressInt = WhichSamplerProgressInt;
+  TuningObj.WhichSGLDProgress = WhichSGLDProgress;
+  TuningObj.WhichSGLDProgressInt = WhichSGLDProgressInt;
   return TuningObj;
   
 }
@@ -132,6 +142,7 @@ para ConvertPara(Rcpp::List Para_List) {
   arma::mat GradLZ = Para_List["GradLZ"];
   arma::mat GradZl = Para_List["GradZl"];
   arma::mat GradLl = Para_List["GradLl"];
+  arma::mat SigmaPrime = Para_List["SigmaPrime"];
     
   //Convert to C++ struct
   para Para;
@@ -153,5 +164,6 @@ para ConvertPara(Rcpp::List Para_List) {
   Para.GradLZ = GradLZ;
   Para.GradZl = GradZl;
   Para.GradLl = GradLl;
+  Para.SigmaPrime = SigmaPrime;
   return Para;
 }

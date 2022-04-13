@@ -22,12 +22,14 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   int S = TuningObj.S;
   int NOmega = DatObj.NOmega;
   int NKeep = TuningObj.NKeep;
+  int AlgorithmInd = DatObj.AlgorithmInd;
   arma::Col<int> SeqNUnits = DatObj.SeqNUnits;
   arma::colvec ProbNUnits = DatObj.ProbNUnits;
   arma::vec WhichKeep = TuningObj.WhichKeep;
   arma::vec WhichMAPProgress = TuningObj.WhichMAPProgress;
   arma::vec WhichMAPProgressInt = TuningObj.WhichMAPProgressInt;
   arma::vec WhichSamplerProgress = TuningObj.WhichSamplerProgress;
+  arma::vec WhichSamplerProgressInt = TuningObj.WhichSamplerProgressInt;
   std::pair<para, tuning> Update;
   
   //User output
@@ -42,6 +44,8 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   //Loop over epochs
   for (arma::uword e = 1; e < (NTotal + 1); e++) {
 
+    // Rcpp::Rcout << std::fixed << 0 << std::endl;
+    
     //Check for user interrupt every 1 epochs
     if (e % 1 == 0) Rcpp::checkUserInterrupt();
     
@@ -77,27 +81,39 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
     Para = UpdatePara(DatObj, Para);
     
     //Save parameters
+    if (AlgorithmInd == 0) { // sgd
+      OmegaMat.col(e - 1) = Para.Omega;
+    }
     if (e == NEpochs) OmegaMAP = Para.Omega;
-    if (std::find(WhichKeep.begin(), WhichKeep.end(), e) != WhichKeep.end())
-      OmegaMat.cols(find(e == WhichKeep)) = Para.Omega;
-      
+    if (AlgorithmInd > 0) { // sgld and sgld_corrected
+      if (std::find(WhichKeep.begin(), WhichKeep.end(), e) != WhichKeep.end())
+        OmegaMat.cols(find(e == WhichKeep)) = Para.Omega;
+    }  
+    
     //Update MAP progress bar
     if (Interactive) if (std::find(WhichMAPProgress.begin(), WhichMAPProgress.end(), e) != WhichMAPProgress.end())
       UpdateMAPBar(e, TuningObj);
     if (!Interactive) if (std::find(WhichMAPProgressInt.begin(), WhichMAPProgressInt.end(), e) != WhichMAPProgressInt.end())
       UpdateMAPBarInt(e, TuningObj);
     
+    //Compute SGLD Correction
+    if (AlgorithmInd == 2 & e == NEpochs) 
+      Para = ComputeSGLDCorrection(DatObj, TuningObj, Para, Interactive);
+    
     //Update SGMCMC progress bar
-    if (e == NEpochs) Rcpp::Rcout << std::fixed << "\nSampler progress:  0%.. ";
-    if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
-      SamplerProgress(e, TuningObj);
+    if (AlgorithmInd > 0) { // sgld and sgld_corrected
+      if (e == NEpochs) BeginSamplerProgress(TuningObj, Interactive);
+      if (Interactive) if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
+        UpdateSamplerBar(e, TuningObj);
+      if (!Interactive) if (std::find(WhichSamplerProgressInt.begin(), WhichSamplerProgressInt.end(), e) != WhichSamplerProgressInt.end())
+        UpdateSamplerBarInt(e, TuningObj);
+    }
     
   //End loop over epochs
   }
 
   //Return raw samples
-  return Rcpp::List::create(Rcpp::Named("map") = OmegaMAP,
-                            Rcpp::Named("samples") = OmegaMat);
-  
+ return Rcpp::List::create(Rcpp::Named("map") = OmegaMAP, Rcpp::Named("samples") = OmegaMat);
+
 //End MCMC sampler function
 }

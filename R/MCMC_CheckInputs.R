@@ -1,7 +1,10 @@
-CheckInputs <- function(pformula, gformula, group, data, family, starting, hypers, tuning, seed) {
+CheckInputs <- function(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed) {
   
   ###Data dimensions
   N <- nrow(data)
+  
+  ###Algorithm
+  if (!algorithm %in% c("sgd", "sgld", "sgld_corrected")) stop('family: Must be one of "sgd", "sgld", or "sgld_corrected"')
   
   ###Family
   if (length(family) != 1) stop(paste0('family: must have 1 or O = ', O, ' entries'))
@@ -14,6 +17,8 @@ CheckInputs <- function(pformula, gformula, group, data, family, starting, hyper
   if (!is.data.frame(data)) stop('"data" must be of class data.frame')
   pformula.test <- model.frame(pformula, data) # check that the variables in formula are in data (will return error)
   gformula.test <- model.frame(gformula, data) # check that the variables in formula are in data (will return error)
+  if (!is.character(group)) stop('"group" must be a character string')
+  if (length(group) > 1) stop('"group" must be length 1')
   group_dat <- data[, group] # will return error if group is not included in data
   NUnits <- length(unique(group_dat))
   
@@ -43,6 +48,10 @@ CheckInputs <- function(pformula, gformula, group, data, family, starting, hyper
   Q <- dim(Z)[2]
   if (any(is.na(Z))) stop('Covariates in gformula cannot contain missing values')
   if (any(is.infinite(Z))) stop('Covariates in gformula cannot contain infinite values')
+
+  ###Data checks for group variable
+  if (any(is.na(group_dat))) stop('"group" variable cannot contain missing values')
+  if (any(is.infinite(group_dat))) stop('"group" variable cannot contain infinite values')
   
   ###hypers
   if (!is.null(hypers)) {

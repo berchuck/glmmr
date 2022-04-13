@@ -23,7 +23,9 @@ struct datobj {
   int Q;
   int NL;
   int FamilyInd;
+  int AlgorithmInd;
   arma::mat EyeQ;
+  arma::mat EyeNOmega;
   arma::Col<int> SeqNUnits;
   arma::colvec ProbNUnits;
   int NOmega;
@@ -51,6 +53,9 @@ struct tuning {
   arma::vec WhichMAPProgress;
   arma::vec WhichMAPProgressInt;
   arma::vec WhichSamplerProgress;
+  arma::vec WhichSamplerProgressInt;
+  arma::vec WhichSGLDProgress;
+  arma::vec WhichSGLDProgressInt;
 };
 struct para {
   arma::colvec Beta;
@@ -71,6 +76,7 @@ struct para {
   arma::mat GradLZ;
   arma::mat GradZl;
   arma::mat GradLl;
+  arma::mat SigmaPrime;
 };
 
 //DISTRIBUTION FUNCTIONS
@@ -78,6 +84,7 @@ arma::vec rnormRcpp(int n, double mean, double sd);
 arma::vec sampleRcpp(arma::Col<int> const& x, int size, bool replace, arma::vec const& prob);
 double rtnormRcppMSM(double mean, double sd, double lower, double upper);
 arma::mat rmvnormRcpp(int n, arma::vec const& mean, arma::mat const& sigma);
+arma::colvec rmvnormRcppRobust(arma::colvec const& Mu, arma::mat const& Sigma);
 double pnormRcpp(double q);
 double lpnormRcpp(double q);
 double UpperpnormRcpp(double q);
@@ -98,8 +105,13 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List);
 para ConvertPara(Rcpp::List Para_List);
 
 //UTILITY FUNCTIONS
+para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive);
 para UpdatePara(datobj DatObj, para Para);
 std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatObj, tuning TuningObj, para Para);
+arma::rowvec get_grad_1_L(arma::mat const& L, int q);
+arma::mat get_grad_w_L(arma::mat const& L, arma::colvec const& v, arma::colvec const& w, int n_L, int q);
+arma::mat ComputeSigmaHatI(int Id, datobj DatObj, tuning TuningObj, para Para);
+arma::mat ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para);
 arma::colvec ComputeGradientPrior(datobj DatObj, hypara HyPara, para Para);
 arma::colvec ComputeGradientI(int Id, arma::mat const& Gamma_i, datobj DatObj, tuning TuningObj, para Para);
 arma::mat SampleGamma(int id, datobj DatObj, tuning TuningObj, para Para);
@@ -108,9 +120,16 @@ arma::mat GetL(arma::mat const& Z, int Q);
 arma::mat GetZ(arma::vec const& l, int Q);
 arma::mat CholInv(arma::mat const& Cov);
 bool rows_equal(arma::mat const& lhs, arma::mat const& rhs, double tol);
+
+//PROGRESS BARS
+void BeginMAPProgress(tuning TuningObj, bool Interactive);
 void UpdateMAPBar(int e, tuning TuningObj);
 void UpdateMAPBarInt(int e, tuning TuningObj);
-void BeginMAPProgress(tuning TuningObj, bool Interactive);
-void SamplerProgress(int e, tuning TuningObj);
+void BeginSamplerProgress(tuning TuningObj, bool Interactive);
+void UpdateSamplerBarInt(int e, tuning TuningObj);
+void UpdateSamplerBar(int e, tuning TuningObj);
+void BeginSGLDProgress(tuning TuningObj, bool Interactive);
+void UpdateSGLDBarInt(int e, tuning TuningObj);
+void UpdateSGLDBar(int e, tuning TuningObj);
 
 #endif // __glmmr__
