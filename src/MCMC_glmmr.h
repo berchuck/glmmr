@@ -14,7 +14,7 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
 struct datobj {
   arma::colvec Y;
   arma::mat X;
-  arma::mat Z;
+  arma::field<arma::mat> Z;
   arma::Col<int> Group;
   arma::Col<int> Group2;
   int N;
@@ -42,6 +42,7 @@ struct tuning {
   arma::vec MNADAM;
   arma::vec NNADAM;
   int S;
+  int S_SGLD;
   int NEpochs;
   int R;
   double EpsilonSGLD;

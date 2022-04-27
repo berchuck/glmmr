@@ -38,20 +38,20 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   //Initialize objects
   int Id;
   arma::mat OmegaMat(NOmega, NKeep), GammaI(DatObj.Q, TuningObj.R);
-  arma::colvec Samps(S), GradLikelihood(NOmega), GradPrior(NOmega), Grad(NOmega);
+  arma::colvec GradLikelihood(NOmega), GradPrior(NOmega), Grad(NOmega);
   arma::colvec OmegaMAP(NOmega);
+  arma::uvec Samps(S);
   
   //Loop over epochs
-  for (arma::uword e = 1; e < (NTotal + 1); e++) {
+  for (arma::uword e = 0; e < NTotal; e++) {
 
-    // Rcpp::Rcout << std::fixed << 0 << std::endl;
-    
     //Check for user interrupt every 1 epochs
     if (e % 1 == 0) Rcpp::checkUserInterrupt();
     
     //Sample mini-batches
-    Samps = sampleRcpp(SeqNUnits, S, true, ProbNUnits);
-
+    // arma::colvec Samps = sampleRcpp(SeqNUnits, S, true, ProbNUnits);
+    Samps = arma::randperm(NUnits, S);
+    
     //Calculate gradient contribution for each subject
     GradLikelihood.zeros();
     for (arma::uword s = 0; s < S; s++) {
@@ -82,9 +82,9 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
     
     //Save parameters
     if (AlgorithmInd == 0) { // sgd
-      OmegaMat.col(e - 1) = Para.Omega;
+      OmegaMat.col(e) = Para.Omega;
     }
-    if (e == NEpochs) OmegaMAP = Para.Omega;
+    if (e == (NEpochs - 1)) OmegaMAP = Para.Omega;
     if (AlgorithmInd > 0) { // sgld and sgld_corrected
       if (std::find(WhichKeep.begin(), WhichKeep.end(), e) != WhichKeep.end())
         OmegaMat.cols(find(e == WhichKeep)) = Para.Omega;
@@ -97,12 +97,12 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       UpdateMAPBarInt(e, TuningObj);
     
     //Compute SGLD Correction
-    if (AlgorithmInd == 2 & e == NEpochs) 
+    if (AlgorithmInd == 2 & e == (NEpochs - 1)) 
       Para = ComputeSGLDCorrection(DatObj, TuningObj, Para, Interactive);
     
     //Update SGMCMC progress bar
     if (AlgorithmInd > 0) { // sgld and sgld_corrected
-      if (e == NEpochs) BeginSamplerProgress(TuningObj, Interactive);
+      if (e == (NEpochs - 1)) BeginSamplerProgress(TuningObj, Interactive);
       if (Interactive) if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
         UpdateSamplerBar(e, TuningObj);
       if (!Interactive) if (std::find(WhichSamplerProgressInt.begin(), WhichSamplerProgressInt.end(), e) != WhichSamplerProgressInt.end())

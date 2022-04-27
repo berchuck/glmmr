@@ -63,6 +63,8 @@
 #'
 #'  \code{EpsilonSGLD}: Epsilon value in the SGLD algorithm. (default = 0.01)
 #'  
+#'  \code{S_SGLD}: The number of groups that are randomly sampled to compute the SGLD correction. (default = total number of groups)
+#'  
 #'  \code{NSims}: The number of SGLD scans for which to perform the
 #'   sampler. (default = \code{5,000})
 #'
@@ -128,7 +130,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   # group = "id"
   # data = dat
   # family = "bernoulli"
-  # algorithm = "sgd"
+  # algorithm = "sgld_corrected"
   # starting = NULL
   # hypers = NULL
   # tuning = list(NSims = 1000, NEpochs = 1000, S = 1)

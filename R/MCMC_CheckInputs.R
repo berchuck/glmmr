@@ -138,7 +138,7 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   ###Tuning Values
   if (!is.null(tuning)) {
     if (!is.list(tuning)) stop('tuning must be a list')
-    if (!all(names(tuning) %in% c("EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "NEpochs", "R", "EpsilonSGLD", "NSims", or "NThin"')
+    if (!all(names(tuning) %in% c("EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "NSims", or "NThin"')
     
     ###If EpsilonNADAM tuning value is provided
     if ("EpsilonNADAM" %in% names(tuning)) {
@@ -223,6 +223,15 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
       if (!is.finite(tuning$S)) stop('tuning: "S" cannot be infinite')
       if (!is.wholenumber(tuning$S) | tuning$S <= 0) stop('tuning: "S" must be a positive integer')
       if (!is.wholenumber(tuning$S) | tuning$S > NUnits) stop('tuning: "S" must be less than the number of unique values in group')
+    }
+    
+    ###If S_SGLD is provided
+    if ("S_SGLD" %in% names(tuning)) {
+      if (!is.scalar(tuning$S_SGLD)) stop('tuning: "S_SGLD" must be a scalar')
+      if (is.na(tuning$S_SGLD)) stop('tuning: "S_SGLD" cannot be NA')
+      if (!is.finite(tuning$S_SGLD)) stop('tuning: "S_SGLD" cannot be infinite')
+      if (!is.wholenumber(tuning$S_SGLD) | tuning$S_SGLD <= 0) stop('tuning: "S_SGLD" must be a positive integer')
+      if (!is.wholenumber(tuning$S_SGLD) | tuning$S_SGLD > NUnits) stop('tuning: "S_SGLD" must be less than the number of unique values in group')
     }
     
   ###End tuning Values

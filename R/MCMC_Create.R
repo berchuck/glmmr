@@ -3,7 +3,7 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
 
   ###Extract group and convert to ordered integers
   dat_group <- dat[, group]
-  dat_group <- as.numeric(as.factor(dat_group))
+  dat_group <- as.numeric(as.factor(dat_group)) - 1
   
   ###Data objects
   N <- nrow(data) # total observations
@@ -18,9 +18,12 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
   P <- ncol(X)
   Q <- ncol(ZMat)
   X <- matrix(X, nrow = N, ncol = P)
-  Z <- bdiag(lapply(split(ZMat, Group), function(x) matrix(x, ncol = Q)))
-  Z <- matrix(Z, nrow = N, ncol = Q * NUnits)
-  Group2 <- rep(1:NUnits, each = Q)
+  # Z <- bdiag(lapply(split(ZMat, Group), function(x) matrix(x, ncol = Q)))
+  # dp <- diff(Z@p)
+  # Zlocations <- t(cbind(Z@i, rep(seq_along(dp), dp) - 1))
+  # Zvalues <- Z@x
+  ZList <- lapply(split(ZMat, Group), function(x) matrix(x, ncol = Q))
+  Group2 <- rep(0:(NUnits - 1), each = Q)
   NL <- choose(Q, 2)
   NOmega <- P + NL + Q
   
@@ -44,7 +47,9 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
   DatObj <- list()
   DatObj$Y <- Y
   DatObj$X <- X
-  DatObj$Z <- Z
+  # DatObj$Zlocations <- Zlocations
+  # DatObj$Zvalues <- Zvalues
+  DatObj$ZList <- ZList
   DatObj$Group <- Group
   DatObj$Group2 <- Group2
   DatObj$N <- N
@@ -119,6 +124,8 @@ CreateTuningObj <- function(tuning, DatObj) {
   if (!("NuNADAM" %in% UserTuning)) NuNADAM <- 0.999
   if ("S" %in% UserTuning) S <- tuning$S
   if (!("S" %in% UserTuning)) S <- min(10, NUnits)
+  if ("S_SGLD" %in% UserTuning) S_SGLD <- tuning$S_SGLD
+  if (!("S_SGLD" %in% UserTuning)) S_SGLD <- NUnits
   if ("NEpochs" %in% UserTuning) NEpochs <- tuning$NEpochs
   if (!("NEpochs" %in% UserTuning)) NEpochs <- 1000
   if ("R" %in% UserTuning) R <- tuning$R
@@ -137,17 +144,17 @@ CreateTuningObj <- function(tuning, DatObj) {
   if (!(is.wholenumber(NSims / NThin))) stop('tuning: "NThin" must be a factor of "NSims"')
 
   ###Burn-in progress bar
-  WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin
+  WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin - 1
   NKeep <- length(WhichKeep)
   BarLength <- 50 #Burn-in bar length (arbitrary)
   ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
   SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
-  WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1))
-  WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : NUnits <= x * NUnits), 1))
-  WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs
-  WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1))
-  WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NUnits <= x * NUnits), 1))
-  WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs
+  WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
+  WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
+  WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+  WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
+  WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
+  WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
   if (AlgorithmInd == 0) NSims <- 0
   if (AlgorithmInd == 0) NKeep <- NEpochs
   
@@ -160,6 +167,7 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$MNADAM <- matrix(0, nrow = P + NL + Q)
   TuningObj$NNADAM <- matrix(0, nrow = P + NL + Q)
   TuningObj$S <- S
+  TuningObj$S_SGLD <- S_SGLD
   TuningObj$NEpochs <- NEpochs
   TuningObj$R <- R
   TuningObj$EpsilonSGLD <- EpsilonSGLD

@@ -7,26 +7,32 @@ para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Inte
   //Set data objects
   int NUnits = DatObj.NUnits;
   int NOmega = DatObj.NOmega;
+  arma::mat EyeNOmega = DatObj.EyeNOmega;
   
   //Set tuning objects
   arma::vec WhichSGLDProgress = TuningObj.WhichSGLDProgress;
   arma::vec WhichSGLDProgressInt = TuningObj.WhichSGLDProgressInt;
+  double EpsilonSGLD = TuningObj.EpsilonSGLD;
+  int S_SGLD = TuningObj.S_SGLD;
   
   //User output
   BeginSGLDProgress(TuningObj, Interactive);
   
   //Initialize objects
   arma::mat SigmaSum(NOmega, NOmega, arma::fill::zeros);
-
+  arma::uvec Samps = arma::randperm(NUnits, S_SGLD);
+  
   //Loop over all units
-  for (arma::uword i = 1; i < (NUnits + 1); i++) {
-    SigmaSum += ComputeSigmaHatI(i, DatObj, TuningObj, Para);
+  for (arma::uword i = 0; i < S_SGLD; i++) {
+    SigmaSum += ComputeSigmaHatI(Samps(i), DatObj, TuningObj, Para);
     if (Interactive) if (std::find(WhichSGLDProgress.begin(), WhichSGLDProgress.end(), i) != WhichSGLDProgress.end())
       UpdateSGLDBar(i, TuningObj);
     if (!Interactive) if (std::find(WhichSGLDProgressInt.begin(), WhichSGLDProgressInt.end(), i) != WhichSGLDProgressInt.end())
       UpdateSGLDBarInt(i, TuningObj);
   }
-  Para.SigmaPrime = arma::chol(SigmaSum) / sqrt(NUnits);
+  arma::mat SigmaPrime = arma::chol(SigmaSum) / sqrt(S_SGLD);
+  arma::mat Sigma = sqrt(2) * EyeNOmega - sqrt(EpsilonSGLD) * SigmaPrime;
+  Para.SigmaPrime = EpsilonSGLD * Sigma * Sigma.t();
   return Para;
   
 }
@@ -47,7 +53,7 @@ arma::mat ComputeSigmaHatI(int Id, datobj DatObj, tuning TuningObj, para Para) {
   int NOmega = DatObj.NOmega;
   arma::colvec Y = DatObj.Y;
   arma::mat X = DatObj.X;
-  arma::mat Z = DatObj.Z;
+  arma::field<arma::mat> Z = DatObj.Z;
   arma::Col<int> Group = DatObj.Group;
   arma::Col<int> Group2 = DatObj.Group2;
   
@@ -68,7 +74,8 @@ arma::mat ComputeSigmaHatI(int Id, datobj DatObj, tuning TuningObj, para Para) {
   arma::uvec indeces_col = arma::find(Group2 == Id);
   arma::mat x_i = X.rows(indeces_row);
   arma::colvec x_i_beta = x_i * Beta;
-  arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  // arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  arma::mat z_i = Z(Id);
   arma::colvec y_i = Y(indeces_row);
   
   //Compute GLMM mean parameter
@@ -182,8 +189,7 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   //Set data objects
   int NOmega = DatObj.NOmega;
   int AlgorithmInd = DatObj.AlgorithmInd;
-  arma::mat EyeNOmega = DatObj.EyeNOmega;
-  
+
   //Set tuning objects
   double EpsilonNADAM = TuningObj.EpsilonNADAM;
   double MuNADAM = TuningObj.MuNADAM;
@@ -198,7 +204,7 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   arma::colvec Omega = Para.Omega;
   
   //Update omega using NADAM
-  if (e < (NEpochs + 1)) {
+  if (e < NEpochs) {
     double mhat, nhat;
     for (arma::uword i = 0; i < NOmega; i++) {
       MNADAM(i) = MuNADAM * MNADAM(i) + (1 - MuNADAM) * Grad(i);
@@ -211,20 +217,16 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   
   //Update omega using SGLD with or without the correction
   if (AlgorithmInd > 0) {
-    if (e > NEpochs) {
+    if (e >= NEpochs) {
       if (AlgorithmInd == 1) Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
-      if (AlgorithmInd == 2) {
-        arma::mat SigmaPrime = Para.SigmaPrime;
-        arma::mat Sigma = sqrt(2) * EyeNOmega - sqrt(EpsilonSGLD) * SigmaPrime;
-        Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), EpsilonSGLD * Sigma * Sigma.t());
-      }
+      if (AlgorithmInd == 2) Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaPrime); // SGLD with correction
     }
   }
   //Update parameter object
   Para.Omega = Omega;
   
   //Update tuning object
-  if (e < (NEpochs + 1)) {
+  if (e < NEpochs) {
     TuningObj.MNADAM = MNADAM;
     TuningObj.NNADAM = NNADAM;
   }
@@ -365,7 +367,7 @@ arma::colvec ComputeGradientI(int Id, arma::mat const& GammaI, datobj DatObj, tu
   int NL = DatObj.NL;
   arma::colvec Y = DatObj.Y;
   arma::mat X = DatObj.X;
-  arma::mat Z = DatObj.Z;
+  arma::field<arma::mat> Z = DatObj.Z;
   arma::Col<int> Group = DatObj.Group;
   arma::Col<int> Group2 = DatObj.Group2;
 
@@ -386,7 +388,8 @@ arma::colvec ComputeGradientI(int Id, arma::mat const& GammaI, datobj DatObj, tu
   arma::uvec indeces_col = arma::find(Group2 == Id);
   arma::mat x_i = X.rows(indeces_row);
   arma::colvec x_i_beta = x_i * Beta;
-  arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  // arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  arma::mat z_i = Z(Id);
   arma::colvec y_i = Y(indeces_row);
   
   //Compute GLMM mean parameter
@@ -445,7 +448,7 @@ arma::mat SampleGamma(int Id, datobj DatObj, tuning TuningObj, para Para) {
   int Q = DatObj.Q;
   arma::colvec Y = DatObj.Y;
   arma::mat X = DatObj.X;
-  arma::mat Z = DatObj.Z;
+  arma::field<arma::mat> Z = DatObj.Z;
   arma::Col<int> Group = DatObj.Group;
   arma::Col<int> Group2 = DatObj.Group2;
   
@@ -461,7 +464,8 @@ arma::mat SampleGamma(int Id, datobj DatObj, tuning TuningObj, para Para) {
   arma::uvec indeces_col = arma::find(Group2 == Id);
   arma::mat x_i = X.rows(indeces_row);
   arma::colvec x_i_beta = x_i * Beta;
-  arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  // arma::mat z_i = Z.submat(indeces_row, indeces_col);
+  arma::mat z_i = Z(Id);
   arma::colvec y_i = Y(indeces_row);
   int n_i = x_i.n_rows;
   

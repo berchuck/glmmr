@@ -80,6 +80,8 @@ include: \code{"sgd"}, \code{"sgld"}, and \code{"sgld_corrected"}.}
 
  \code{EpsilonSGLD}: Epsilon value in the SGLD algorithm. (default = 0.01)
  
+ \code{S_SGLD}: The number of groups that are randomly sampled to compute the SGLD correction. (default = total number of groups)
+ 
  \code{NSims}: The number of SGLD scans for which to perform the
   sampler. (default = \code{5,000})
 

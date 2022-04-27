@@ -7,7 +7,9 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   //Set objects from List
   arma::colvec Y = DatObj_List["Y"];
   arma::mat X = DatObj_List["X"];
-  arma::mat Z = DatObj_List["Z"];
+  // arma::umat Zlocations = DatObj_List["Zlocations"];
+  // arma::vec Zvalues = DatObj_List["Zvalues"];
+  Rcpp::List ZList = DatObj_List["ZList"];
   arma::Col<int> Group = DatObj_List["Group"];
   arma::Col<int> Group2 = DatObj_List["Group2"];
   int N = DatObj_List["N"];
@@ -22,7 +24,15 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   arma::mat EyeNOmega = DatObj_List["EyeNOmega"];
   arma::Col<int> SeqNUnits = arma::linspace<arma::Col<int>>(1, NUnits, NUnits);
   arma::colvec ProbNUnits = arma::ones<arma::colvec>(NUnits) / NUnits;
-
+  
+  //Construct Z
+  arma::field<arma::mat> Z(NUnits);
+  for (arma::uword i = 0; i < NUnits; i++) {
+   arma::mat z_i = ZList[i];
+    Z(i) = z_i; 
+  }
+  // arma::sp_mat Z(Zlocations, Zvalues, N, Q * NUnits);
+  
   //Convert to C++ struct
   datobj DatObj;
   DatObj.Y = Y;
@@ -76,6 +86,7 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   arma::vec MNADAM = TuningObj_List["MNADAM"];
   arma::vec NNADAM = TuningObj_List["NNADAM"];
   int S = TuningObj_List["S"];
+  int S_SGLD = TuningObj_List["S_SGLD"];
   int NEpochs = TuningObj_List["NEpochs"];
   int R = TuningObj_List["R"];
   double EpsilonSGLD = TuningObj_List["EpsilonSGLD"];
@@ -100,6 +111,7 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.MNADAM = MNADAM;
   TuningObj.NNADAM = NNADAM;
   TuningObj.S = S;
+  TuningObj.S_SGLD = S_SGLD;
   TuningObj.NEpochs = NEpochs;
   TuningObj.R = R;
   TuningObj.EpsilonSGLD = EpsilonSGLD;
