@@ -2,19 +2,21 @@
 #include "MCMC_glmmr.h"
 
 //Initiate burn-in progress bar--------------------------------------------------------------------------
-void BeginMAPProgress(tuning TuningObj, bool Interactive) {
+void BeginMAPProgress(tuning TuningObj, bool Interactive, int AlgorithmInd) {
 
   //Set MCMC object
   int BarLength = TuningObj.BarLength;
 
   //Initialize burn-in bar
   if (Interactive) {
-    Rcpp::Rcout << std::fixed << "Identifying MAP:  |";
+    if (AlgorithmInd < 3) Rcpp::Rcout << std::fixed << "Identifying MAP:  |";
+    if (AlgorithmInd == 3) Rcpp::Rcout << std::fixed << "Burnin Progress:  |";
     for (int i = 0; i < BarLength - 1; i++) Rcpp::Rcout << std::fixed << " ";
     Rcpp::Rcout << std::fixed <<  "|" << std::fixed;
   }
   if (!Interactive) {
-    Rcpp::Rcout << std::fixed << "Identifying MAP:  0%..  ";
+    if (AlgorithmInd < 3) Rcpp::Rcout << std::fixed << "Identifying MAP:  0%..  ";
+    if (AlgorithmInd == 3) Rcpp::Rcout << std::fixed << "Burnin Progress:  0%..  ";
   }
 
 }
@@ -140,7 +142,7 @@ void UpdateSamplerBarInt(int e, tuning TuningObj) {
 
 
 //Update burn-in progress bar----------------------------------------------------------------------------
-void UpdateMAPBar(int e, tuning TuningObj) {
+void UpdateMAPBar(int e, tuning TuningObj, int AlgorithmInd) {
 
   //Set MCMC object
   arma::vec WhichMAPProgress = TuningObj.WhichMAPProgress;
@@ -150,7 +152,8 @@ void UpdateMAPBar(int e, tuning TuningObj) {
   arma::uvec NewStarBoolean = find(e == WhichMAPProgress);
   arma::vec NewStarBooleanVec = arma::conv_to<arma::vec>::from(NewStarBoolean);
   int NewStar = NewStarBooleanVec(0);
-  Rcpp::Rcout << std::fixed << "\rIdentifying MAP:  |";
+  if (AlgorithmInd < 3) Rcpp::Rcout << std::fixed << "\rIdentifying MAP:  |";
+  if (AlgorithmInd == 3) Rcpp::Rcout << std::fixed << "\rBurnin Progress:  |";
   for (int i = 0; i < NewStar; i++) Rcpp::Rcout << std::fixed << "*";
   for (int i = 0; i < (BarLength - 1 - NewStar); i++) Rcpp::Rcout << std::fixed << " ";
   Rcpp::Rcout << std::fixed << "|";
@@ -194,5 +197,71 @@ void UpdateSamplerBar(int e, tuning TuningObj) {
   for (int i = 0; i < NewStar; i++) Rcpp::Rcout << std::fixed << "*";
   for (int i = 0; i < (BarLength - 1 - NewStar); i++) Rcpp::Rcout << std::fixed << " ";
   Rcpp::Rcout << std::fixed << "|";
+  
+}
+
+
+
+//Function to pilot adapt tuning parameter--------------------------------------------------------------
+double PilotAdaptFunc(double TuningParameter, double AcceptancePct) {
+  
+  //Adjust tuning parameter using scaling based on size of acceptance rate
+  if (AcceptancePct >= 0.90) TuningParameter *= 1.3;
+  if ( (AcceptancePct >= 0.75 ) & (AcceptancePct < 0.90 ) ) TuningParameter *= 1.2;
+  if ( (AcceptancePct >= 0.45 ) & (AcceptancePct < 0.75 ) ) TuningParameter *= 1.1;
+  if ( (AcceptancePct <= 0.25 ) & (AcceptancePct > 0.15 ) ) TuningParameter *= 0.9;
+  if ( (AcceptancePct <= 0.15 ) & (AcceptancePct > 0.10 ) ) TuningParameter *= 0.8;
+  if (AcceptancePct <= 0.10) TuningParameter *= 0.7;
+  return TuningParameter;
+  
+}
+
+
+
+//Function for implementing pilot adaptation in MCMC sampler--------------------------------------------
+tuning PilotAdaptation(datobj DatObj, tuning TuningObj) {
+  
+  //Set data objects
+  int Q = DatObj.Q;
+  int NL = DatObj.NL;
+  
+  //Set Metropolis objects
+  arma::vec MetropL = TuningObj.MetropL;
+  arma::vec AcceptanceL = TuningObj.AcceptanceL;
+  arma::vec MetropD = TuningObj.MetropD;
+  arma::vec AcceptanceD = TuningObj.AcceptanceD;
+
+  //Set MCMC objects
+  int PilotAdaptDenominator = TuningObj.PilotAdaptDenominator;
+  
+  //Get acceptance percentages
+  arma::vec PctL = AcceptanceL / double(PilotAdaptDenominator);
+  arma::vec PctD = AcceptanceD / double(PilotAdaptDenominator);
+
+  //Update Tuning Parameter
+  for (int i = 0; i < NL; i++) MetropL(i) = PilotAdaptFunc(MetropL(i), PctL(i));
+  for (int i = 0; i < Q; i++) MetropD(i) = PilotAdaptFunc(MetropD(i), PctD(i));
+  TuningObj.MetropL = MetropL;
+  TuningObj.MetropD = MetropD;
+
+  //Zero the acceptance counters
+  AcceptanceL.zeros();
+  AcceptanceD.zeros();
+  TuningObj.AcceptanceL = AcceptanceL;
+  TuningObj.AcceptanceD = AcceptanceD;
+  return TuningObj;
+  
+}
+
+
+
+//Output Metropolis object for summary-------------------------------------------------------------------
+Rcpp::List OutputMetrObj(tuning TuningObj) {
+  
+  Rcpp::List Out = Rcpp::List::create(Rcpp::Named("AcceptanceL") = TuningObj.AcceptanceL,
+                                      Rcpp::Named("MetropL") = TuningObj.MetropL,
+                                      Rcpp::Named("AcceptanceD") = TuningObj.AcceptanceD,
+                                      Rcpp::Named("MetropD") = TuningObj.MetropD);
+  return Out;
   
 }

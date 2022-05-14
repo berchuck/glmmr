@@ -101,6 +101,13 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   arma::vec WhichSamplerProgressInt = TuningObj_List["WhichSamplerProgressInt"];
   arma::vec WhichSGLDProgress = TuningObj_List["WhichSGLDProgress"];
   arma::vec WhichSGLDProgressInt = TuningObj_List["WhichSGLDProgressInt"];
+  arma::vec WhichPilotAdapt = TuningObj_List["WhichPilotAdapt"];
+  int PilotAdaptDenominator = TuningObj_List["PilotAdaptDenominator"];
+  arma::vec MetropL = TuningObj_List["MetropL"];
+  arma::vec AcceptanceL = TuningObj_List["AcceptanceL"];
+  arma::vec MetropD = TuningObj_List["MetropD"];
+  arma::vec AcceptanceD = TuningObj_List["AcceptanceD"];
+  arma::vec OriginalTuners = TuningObj_List["OriginalTuners"];
   
   //Convert to C++ struct
   tuning TuningObj;
@@ -126,6 +133,13 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.WhichSamplerProgressInt = WhichSamplerProgressInt;
   TuningObj.WhichSGLDProgress = WhichSGLDProgress;
   TuningObj.WhichSGLDProgressInt = WhichSGLDProgressInt;
+  TuningObj.WhichPilotAdapt = WhichPilotAdapt;
+  TuningObj.PilotAdaptDenominator = PilotAdaptDenominator;
+  TuningObj.MetropL = MetropL;
+  TuningObj.AcceptanceL = AcceptanceL;
+  TuningObj.MetropD = MetropD;
+  TuningObj.AcceptanceD = AcceptanceD;
+  TuningObj.OriginalTuners = OriginalTuners;
   return TuningObj;
   
 }
@@ -155,6 +169,8 @@ para ConvertPara(Rcpp::List Para_List) {
   arma::mat GradZl = Para_List["GradZl"];
   arma::mat GradLl = Para_List["GradLl"];
   arma::mat SigmaPrime = Para_List["SigmaPrime"];
+  arma::vec omega = Para_List["omega"];
+  arma::mat Gamma = Para_List["Gamma"];
     
   //Convert to C++ struct
   para Para;
@@ -177,5 +193,7 @@ para ConvertPara(Rcpp::List Para_List) {
   Para.GradZl = GradZl;
   Para.GradLl = GradLl;
   Para.SigmaPrime = SigmaPrime;
+  Para.omega = omega;
+  Para.Gamma = Gamma;
   return Para;
 }

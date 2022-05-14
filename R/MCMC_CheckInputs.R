@@ -4,11 +4,9 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   N <- nrow(data)
   
   ###Algorithm
-  if (!algorithm %in% c("sgd", "sgld", "sgld_corrected")) stop('family: Must be one of "sgd", "sgld", or "sgld_corrected"')
+  if (!algorithm %in% c("sgd", "sgld", "sgld_corrected", "gibbs")) stop('family: Must be one of "sgd", "sgld", "sgld_corrected", or "gibbs"')
   
   ###Family
-  if (length(family) != 1) stop(paste0('family: must have 1 or O = ', O, ' entries'))
-  bool <- logical(length = length(family))
   if (!family %in% c("normal", "bernoulli", "poisson")) stop('family: Must be one of "normal", "bernoulli", or "poisson"')
 
   ###Data and Formula
@@ -138,7 +136,41 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   ###Tuning Values
   if (!is.null(tuning)) {
     if (!is.list(tuning)) stop('tuning must be a list')
-    if (!all(names(tuning) %in% c("EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "NSims", or "NThin"')
+    if (!all(names(tuning) %in% c("NPilot", "TuneD", "TuneL", "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin", "NPilot", "TuneL", or "TuneD"')
+    
+    ###If L tuning values are provided
+    if ("TuneL" %in% names(tuning)) {
+      if (!is.numeric(tuning$TuneL) | !is.scalar(tuning$TuneL)) stop('tuning: "TuneL" must a vector or scalar')
+      if (length(tuning$TuneL) > 1) {
+        if (length(tuning$TuneL) != M) stop(paste0('tuning: "TuneL" must have length ', NL))
+        if (!all(!is.na(tuning$TuneL))) stop('tuning: "TuneL" cannot have missing values')
+        if (!all(is.finite(tuning$TuneL))) stop('tuning: "TuneL" cannot have infinite values')
+        if (any(tuning$TuneL < 0)) stop('tuning: "TuneL" must have non-negative components')
+      }
+      if (is.scalar(tuning$TuneL)) {
+        if (!is.scalar(tuning$TuneL)) stop('tuning: "TuneL" must be a scalar')
+        if (is.na(tuning$TuneL)) stop('tuning: "TuneL" cannot be NA')
+        if (!is.finite(tuning$TuneL)) stop('tuning: "TuneL" cannot be infinite')
+        if (tuning$TuneL < 0) stop('tuning: "TuneL" must be non-negative')
+      }
+    }
+    
+    ###If D tuning values are provided
+    if ("TuneD" %in% names(tuning)) {
+      if (!is.numeric(tuning$TuneD) | !is.scalar(tuning$TuneD)) stop('tuning: "TuneD" must a vector or scalar')
+      if (length(tuning$TuneD) > 1) {
+        if (length(tuning$TuneD) != M) stop(paste0('tuning: "TuneD" must have length ', Q))
+        if (!all(!is.na(tuning$TuneD))) stop('tuning: "TuneD" cannot have missing values')
+        if (!all(is.finite(tuning$TuneD))) stop('tuning: "TuneD" cannot have infinite values')
+        if (any(tuning$TuneD < 0)) stop('tuning: "TuneD" must have non-negative components')
+      }
+      if (is.scalar(tuning$TuneD)) {
+        if (!is.scalar(tuning$TuneD)) stop('tuning: "TuneD" must be a scalar')
+        if (is.na(tuning$TuneD)) stop('tuning: "TuneD" cannot be NA')
+        if (!is.finite(tuning$TuneD)) stop('tuning: "TuneD" cannot be infinite')
+        if (tuning$TuneD < 0) stop('tuning: "TuneD" must be non-negative')
+      }
+    }
     
     ###If EpsilonNADAM tuning value is provided
     if ("EpsilonNADAM" %in% names(tuning)) {
@@ -205,6 +237,15 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
       if (!is.finite(tuning$NThin)) stop('tuning: "NThin" cannot be infinite')
       if (!is.wholenumber(tuning$NThin) | tuning$NThin <= 0) stop('tuning: "NThin" must be a positive integer')
       # if (!is.wholenumber(tuning$NSims / tuning$NThin)) stop('tuning: "NThin" must be a factor of "NSims"') enforced in Createtuning();
+    }
+    
+    ###If NPilot is provided
+    if ("NPilot" %in% names(tuning)) {
+      if (!is.scalar(tuning$NPilot)) stop('tuning: "NPilot" must be a scalar')
+      if (is.na(tuning$NPilot)) stop('tuning: "NPilot" cannot be NA')
+      if (!is.finite(tuning$NPilot)) stop('tuning: "NPilot" cannot be infinite')
+      if (!is.wholenumber(tuning$NPilot) | tuning$NPilot < 0) stop('tuning: "NPilot" must be a positive integer')
+      # if (!is.wholenumber(tuning$NBurn / tuning$NPilot)) stop('tuning: "NPilot" must be a factor of "NBurn"') enforced in Createmcmc();
     }
     
     ###If R is provided

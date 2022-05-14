@@ -42,6 +42,7 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
   if (algorithm == "sgd") AlgorithmInd <- 0
   if (algorithm == "sgld") AlgorithmInd <- 1
   if (algorithm == "sgld_corrected") AlgorithmInd <- 2
+  if (algorithm == "gibbs") AlgorithmInd <- 3
   
   ###Make parameters global
   DatObj <- list()
@@ -138,11 +139,24 @@ CreateTuningObj <- function(tuning, DatObj) {
   if (!("NSims" %in% UserTuning)) NSims <- 5000
   if ("NThin" %in% UserTuning) NThin <- tuning$NThin
   if (!("NThin" %in% UserTuning)) NThin <- 1
+  if ("NPilot" %in% UserTuning) NPilot <- tuning$NPilot
+  if (!("NPilot" %in% UserTuning)) NPilot <- 20
+  
+  ###Metropolis tuning
+  if ("TuneL" %in% UserTuning) MetropL <- numeric(tuning$TuneL, length = NL)
+  if (!("TuneL" %in% UserTuning)) MetropL <- rep(1, NL)
+  if ("TuneD" %in% UserTuning) MetropD <- numeric(tuning$TuneD, length = Q)
+  if (!("TuneD" %in% UserTuning)) MetropD <- rep(1, Q)
   
   ###One last check of MCMC user inputs
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   if (!(is.wholenumber(NSims / NThin))) stop('tuning: "NThin" must be a factor of "NSims"')
-
+  if (AlgorithmInd == 3) if (!(is.wholenumber(NEpochs / NPilot))) stop('tuning: "NPilot" must be a factor of "NEpochs"')
+  
+  ###Pilot adaptation objects
+  WhichPilotAdapt <- (1:NPilot) * NEpochs / NPilot - 1
+  PilotAdaptDenominator <- WhichPilotAdapt[1] + 1
+  
   ###Burn-in progress bar
   WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin - 1
   NKeep <- length(WhichKeep)
@@ -157,6 +171,10 @@ CreateTuningObj <- function(tuning, DatObj) {
   WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
   if (AlgorithmInd == 0) NSims <- 0
   if (AlgorithmInd == 0) NKeep <- NEpochs
+  
+  ###Set acceptance rate counters
+  AcceptanceL <- rep(0, NL)
+  AcceptanceD <- rep(0, Q)
   
   ###Return SGD object
   TuningObj <- list()
@@ -183,6 +201,13 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$WhichSamplerProgressInt <- WhichSamplerProgressInt
   TuningObj$WhichSGLDProgress <- WhichSGLDProgress
   TuningObj$WhichSGLDProgressInt <- WhichSGLDProgressInt
+  TuningObj$WhichPilotAdapt <- WhichPilotAdapt
+  TuningObj$PilotAdaptDenominator <- PilotAdaptDenominator
+  TuningObj$MetropL <- MetropL
+  TuningObj$AcceptanceL <- AcceptanceL
+  TuningObj$MetropD <- MetropD
+  TuningObj$AcceptanceD <- AcceptanceD
+  TuningObj$OriginalTuners <- c(MetropL, MetropD)
   return(TuningObj)
   
 }
@@ -196,8 +221,10 @@ CreatePara <- function(starting, DatObj) {
   P <- DatObj$P
   Q <- DatObj$Q
   NL <- DatObj$NL
+  N <- DatObj$N
   NOmega <- DatObj$NOmega
   EyeQ <- DatObj$EyeQ
+  NUnits <- DatObj$NUnits
 
   ###Which parameters are user defined?
   UserStarters <- names(starting)
@@ -230,6 +257,10 @@ CreatePara <- function(starting, DatObj) {
   GradZl <- diag(as.numeric(1 / cosh(l)^2), nrow = NL, ncol = NL)
   GradLl <- GradLZ %*% GradZl
   
+  ###Parameters for Gibbs algorithm
+  Gamma <- matrix(0, nrow = Q, ncol = NUnits)
+  omega <- matrix(0, nrow = N, ncol = 1)
+  
   ###Save parameter objects
   Para <- list()
   Para$Beta <- Beta
@@ -251,6 +282,8 @@ CreatePara <- function(starting, DatObj) {
   Para$GradZl <- GradZl
   Para$GradLl <- GradLl
   Para$SigmaPrime <- matrix(0, nrow = NOmega, ncol = NOmega)
+  Para$Gamma <- Gamma
+  Para$omega <- omega
   return(Para)
 
 }

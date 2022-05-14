@@ -57,6 +57,13 @@ struct tuning {
   arma::vec WhichSamplerProgressInt;
   arma::vec WhichSGLDProgress;
   arma::vec WhichSGLDProgressInt;
+  arma::vec WhichPilotAdapt;
+  int PilotAdaptDenominator;
+  arma::vec MetropL;
+  arma::vec AcceptanceL; 
+  arma::vec MetropD;
+  arma::vec AcceptanceD; 
+  arma::vec OriginalTuners;
 };
 struct para {
   arma::colvec Beta;
@@ -78,6 +85,8 @@ struct para {
   arma::mat GradZl;
   arma::mat GradLl;
   arma::mat SigmaPrime;
+  arma::vec omega;
+  arma::mat Gamma;
 };
 
 //DISTRIBUTION FUNCTIONS
@@ -106,6 +115,7 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List);
 para ConvertPara(Rcpp::List Para_List);
 
 //UTILITY FUNCTIONS
+tuning PilotAdaptation(datobj DatObj, tuning TuningObj);
 para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive);
 para UpdatePara(datobj DatObj, para Para);
 std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatObj, tuning TuningObj, para Para);
@@ -121,10 +131,15 @@ arma::mat GetL(arma::mat const& Z, int Q);
 arma::mat GetZ(arma::vec const& l, int Q);
 arma::mat CholInv(arma::mat const& Cov);
 bool rows_equal(arma::mat const& lhs, arma::mat const& rhs, double tol);
+para Sampleomega(datobj DatObj, para Para);
+para SampleBeta(datobj DatObj, para Para);
+para SampleGammaGibbs(datobj DatObj, para Para);
+std::pair<para, tuning> UpdateL(datobj DatObj, hypara HyPara, tuning TuningObj, para Para);
+std::pair<para, tuning> UpdateD(datobj DatObj, hypara HyPara, tuning TuningObj, para Para);
 
 //PROGRESS BARS
-void BeginMAPProgress(tuning TuningObj, bool Interactive);
-void UpdateMAPBar(int e, tuning TuningObj);
+void BeginMAPProgress(tuning TuningObj, bool Interactive, int AlgorithmInd);
+void UpdateMAPBar(int e, tuning TuningObj, int AlgorithmInd);
 void UpdateMAPBarInt(int e, tuning TuningObj);
 void BeginSamplerProgress(tuning TuningObj, bool Interactive);
 void UpdateSamplerBarInt(int e, tuning TuningObj);
@@ -132,5 +147,6 @@ void UpdateSamplerBar(int e, tuning TuningObj);
 void BeginSGLDProgress(tuning TuningObj, bool Interactive);
 void UpdateSGLDBarInt(int e, tuning TuningObj);
 void UpdateSGLDBar(int e, tuning TuningObj);
+Rcpp::List OutputMetrObj(tuning TuningObj);
 
 #endif // __glmmr__

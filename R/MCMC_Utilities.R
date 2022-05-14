@@ -71,6 +71,36 @@ OutputDatObj <- function(DatObj) {
 
 
 
+###Function for summarizing Metropolis objects post sampler--------------------------------------------------------
+SummarizeMetropolis <- function(DatObj, TuningObj, MetropRcpp) {
+  
+  ###Set data object
+  NL <- DatObj$NL
+  Q <- DatObj$Q
+  
+  ###Set tuning object
+  NSims <- TuningObj$NSims
+  
+  ###Set Metropolis objects
+  MetropL <- MetropRcpp$MetropL
+  AcceptanceL <- MetropRcpp$AcceptanceL
+  MetropD <- MetropRcpp$MetropD
+  AcceptanceD <- MetropRcpp$AcceptanceD
+  OriginalTuners <- TuningObj$OriginalTuners
+  
+  ###Summarize and output
+  TuningParameters <- c(MetropL, MetropD)
+  AcceptanceCount <- c(AcceptanceL, AcceptanceD)
+  AcceptancePcts <- AcceptanceCount / NSims
+  MetrSummary <- cbind(AcceptancePcts, TuningParameters, OriginalTuners)
+  rownames(MetrSummary) <- c(paste0("l(", 1:NL, ")"), paste0("d(", 1:Q, ")"))
+  colnames(MetrSummary) <- c("Acceptance", "PilotAdaptedTuners", "OriginalTuners")
+  return(MetrSummary)
+  
+}
+
+
+
 ###Verify the class of our regression object------------------------------------------------------------------------
 #' is.glmmr
 #'

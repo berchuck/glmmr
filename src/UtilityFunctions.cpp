@@ -1,6 +1,390 @@
 #include <RcppArmadillo.h>
 #include "MCMC_glmmr.h"
 
+//Function to sample latent polya-gamma process using Gibbs sampling step------------------------------------------------
+para Sampleomega(datobj DatObj, para Para) {
+
+  //Set data objects
+  int NUnits = DatObj.NUnits;
+  arma::mat X = DatObj.X;
+  arma::field<arma::mat> Z = DatObj.Z;
+  arma::Col<int> Group = DatObj.Group;
+  
+  //Set parameters
+  arma::colvec omega = Para.omega;
+  arma::mat Gamma = Para.Gamma;
+  arma::colvec Beta = Para.Beta;
+  
+  //Loop over unit index
+  for (arma::uword i = 0; i < NUnits; i++) {
+    
+    //Prepare data
+    arma::uvec indeces_row = arma::find(Group == i);
+    arma::mat x_i = X.rows(indeces_row);
+    arma::mat z_i = Z(i);
+    arma::colvec theta_i = x_i * Beta + z_i * Gamma.col(i);
+    int n_i = x_i.n_rows;
+    
+    //Sample latent Variable from full conditional
+    omega(indeces_row) = pgRcpp(arma::ones(n_i), theta_i);
+    
+  //End loop over units 
+  }
+  
+  //Return parameters
+  Para.omega = omega;
+  return Para;
+  
+}
+
+
+
+//Function to sample random effect------------------------------------------------
+para SampleBeta(datobj DatObj, para Para) {
+  
+  //Set data objects
+  int NUnits = DatObj.NUnits;
+  int P = DatObj.P;
+  arma::colvec Y = DatObj.Y;
+  arma::mat X = DatObj.X;
+  arma::field<arma::mat> Z = DatObj.Z;
+  arma::Col<int> Group = DatObj.Group;
+
+  //Set parameters
+  arma::colvec omega = Para.omega;
+  arma::mat Gamma = Para.Gamma;
+
+  //Compute moment sums
+  arma::mat sum1(P, P, arma::fill::zeros);
+  arma::colvec sum2(P, arma::fill::zeros);
+  for (arma::uword i = 0; i < NUnits; i++) {
+    arma::uvec indeces_row = arma::find(Group == i);
+    arma::mat x_i = X.rows(indeces_row);
+    arma::mat z_i = Z(i);
+    arma::colvec y_i = Y(indeces_row);
+    arma::colvec omega_i = omega(indeces_row);
+    arma::colvec ystar = ((y_i - 0.5) / omega_i);
+    arma::mat D_omega_i = arma::diagmat(omega_i);
+    arma::mat tx_i_D_omega_i = arma::trans(x_i) * D_omega_i;
+    sum1 += tx_i_D_omega_i * x_i;
+    sum2 += tx_i_D_omega_i * (ystar - z_i * Gamma.col(i));
+  }
+    
+  //Compute moments
+  arma::mat cov_beta(P, P);
+  bool not_singular = arma::inv_sympd(cov_beta, sum1);
+  if (!not_singular) Rcpp::stop("Beta covariance singular");
+  arma::colvec mean_beta = cov_beta * sum2;
+    
+  //Sample beta
+  // Beta = rmvnormRcpp(1, mean_beta, cov_beta);
+  arma::colvec Beta = rmvnormRcppRobust(mean_beta, cov_beta);
+  
+  //Return Beta
+  Para.Beta = Beta;
+  Para.Omega = arma::join_cols(Beta, Para.l, Para.d);
+  return Para;
+  
+}
+
+
+
+//Function to sample random effectsp------------------------------------------------
+para SampleGammaGibbs(datobj DatObj, para Para) {
+  
+  //Set data objects
+  int NUnits = DatObj.NUnits;
+  int Q = DatObj.Q;
+  arma::colvec Y = DatObj.Y;
+  arma::mat X = DatObj.X;
+  arma::field<arma::mat> Z = DatObj.Z;
+  arma::Col<int> Group = DatObj.Group;
+  arma::Col<int> Group2 = DatObj.Group2;
+  
+  //Set parameters
+  arma::colvec omega = Para.omega;
+  arma::mat Gamma = Para.Gamma;
+  arma::colvec Beta = Para.Beta;
+  arma::mat SigmaInv = Para.SigmaInv;
+  
+  //Loop over unit index
+  for (arma::uword i = 0; i < NUnits; i++) {
+    
+    //Prepare data
+    arma::uvec indeces_row = arma::find(Group == i);
+    arma::mat x_i = X.rows(indeces_row);
+    arma::colvec x_i_beta = x_i * Beta;
+    arma::mat z_i = Z(i);
+    arma::colvec y_i = Y(indeces_row);
+    arma::colvec omega_i = omega(indeces_row);
+
+    //Compute moments
+    arma::mat D_omega_i = arma::diagmat(omega_i);
+    arma::mat tz_i_D_omega_i = arma::trans(z_i) * D_omega_i;
+    // arma::mat cov_gamma = CholInv(tz_i_D_omega_i * z_i + SigmaInv);
+    arma::mat cov_gamma(Q, Q);
+    bool not_singular = arma::inv_sympd(cov_gamma, tz_i_D_omega_i * z_i + SigmaInv);
+    if (!not_singular) Rcpp::stop("Gamma covariance singular");
+    arma::colvec ystar = ((y_i - 0.5) / omega_i);
+    arma::colvec mean_gamma = cov_gamma * (tz_i_D_omega_i * (ystar - x_i_beta));
+    
+    //Sample gamma
+    // Gamma.col(r) = rmvnormRcpp(1, mean_gamma, cov_gamma);
+    Gamma.col(i) = rmvnormRcppRobust(mean_gamma, cov_gamma);
+    
+    //End loop over R  
+  }
+  
+  //Return gamma
+  Para.Gamma = Gamma;
+  return Para;
+  
+}
+
+
+
+//Sample L using a Metropolis step------------------------------------------------
+std::pair<para, tuning> UpdateL(datobj DatObj, hypara HyPara, tuning TuningObj, para Para) {
+  
+  //Set data objects
+  int NL = DatObj.NL;
+  arma::mat EyeQ = DatObj.EyeQ;
+  int Q = DatObj.Q;
+  int NUnits = DatObj.NUnits;
+  
+  //Set hyperparameters
+  double Eta = HyPara.Eta;
+  
+  //Set Metropolis Tuning Objects
+  arma::vec MetropL = TuningObj.MetropL;
+  arma::vec AcceptanceL = TuningObj.AcceptanceL;
+  
+  //Set parameter objects
+  arma::mat LInv = Para.LInv;
+  arma::mat DInv = Para.DInv;
+  arma::vec l = Para.l;
+  arma::mat Gamma = Para.Gamma;
+  arma::mat L = Para.L;
+  arma::mat Z = Para.Z;
+  
+  //Loop over visits
+  for (arma::uword k = 0; k < NL; k++) {
+  
+    //Numerical fix for when L becomes singular
+    arma::vec lProposal = l;
+    arma::mat LInvProposal(Q, Q);
+    arma::mat ZProposal;
+    arma::mat LProposal;
+    double lkProposal;
+    bool not_singular = false;
+    while (!not_singular) {
+      
+      //Sample proposal
+      lkProposal = arma::as_scalar(rnormRcpp(1, l(k), sqrt(MetropL(k))));
+      lProposal(k) = lkProposal;
+      
+      //Update L
+      ZProposal = GetZ(lProposal, Q);
+      LProposal = GetL(ZProposal, Q);
+      // Rcpp::Rcout << std::fixed << L.diag() << arma::zeros(Q) << std::endl;
+      not_singular = arma::solve(LInvProposal, arma::trimatl(LProposal), EyeQ);
+
+    }
+    
+    //Random Effect Component (Rooti is the cholesky of the inverse of Sigma)
+    arma::mat RootiProposal = LInvProposal * DInv;
+    arma::mat Rooti = LInv * DInv;
+    double Component1A = 0;
+    double Component1B = 0;
+    for (arma::uword i = 0; i < NUnits; i++) {
+      Component1A += lndMvn(Gamma.col(i), arma::zeros(Q), RootiProposal);
+      Component1B += lndMvn(Gamma.col(i), arma::zeros(Q), Rooti);
+    }
+    double Component1 = Component1A - Component1B;
+    
+    //Prior components
+    double Component21A = 0;
+    double Component21B = 0;
+    double Component22A = 0;
+    double Component22B = 0;
+    double sum21A;
+    double sum21B;
+    double sum22A;
+    double sum22B;
+    for (arma::uword j = 1; j < Q; j++) {
+      sum21A = 0;
+      sum21B = 0;
+      for (arma::uword r = 0; r < j; r++) {
+        sum21A += LProposal(j, r) * LProposal(j, r);
+        sum21B += L(j, r) * L(j, r);
+      }
+      Component21A += ((Q - (j + 1) + 2 * Eta - 2) / 2) * log(1 - sum21A);
+      Component21B += ((Q - (j + 1) + 2 * Eta - 2) / 2) * log(1 - sum21B);
+    }
+    if (Q > 2) {
+      for (arma::uword j = 1; j < Q; j++) {
+        for (arma::uword i = (j + 1); i < Q; i++) {
+          sum22A = 0;
+          sum22B = 0;
+          for (arma::uword r = 0; r < (j - 1); r++) {
+            sum22A += LProposal(i, r) * LProposal(i, r);
+            sum22B += L(i, r) * L(i, r);
+          }
+          Component22A += 0.5 * log(1 - sum22A);
+          Component22B += 0.5 * log(1 - sum22B);
+        }
+      }
+    }
+    double Component23A = -2 * arma::as_scalar(arma::sum(arma::log(cosh(lProposal))));
+    double Component23B = -2 * arma::as_scalar(arma::sum(arma::log(cosh(l))));
+    double Component2A = Component21A + Component22A + Component23A;
+    double Component2B = Component21B + Component22B + Component23B;
+    double Component2 = Component2A - Component2B;
+    
+    //Log acceptance ratio
+    double LogR = Component1 + Component2;
+    
+    //Metropolis update
+    double RandU = randuRcpp();
+    if (log(RandU) < LogR) {
+      
+      //Keep count of acceptances
+      AcceptanceL(k)++;
+      
+      //Update parameters output
+      l = lProposal;
+      Z = ZProposal;
+      L = LProposal;
+      LInv = LInvProposal;
+
+    }
+    
+  //End loop over L entries
+  }
+  
+  //Update Metropolis object
+  TuningObj.AcceptanceL = AcceptanceL;
+  
+  //Update Para objects
+  Para.l = l;
+  Para.Z = Z;
+  Para.L = L;
+  Para.LoverZ = vecLT(L / Z);
+  Para.Upsilon = L * arma::trans(L);
+  Para.Sigma = Para.D * Para.Upsilon * Para.D;
+  Para.LInv = LInv;
+  Para.tLInv = arma::trans(LInv);
+  Para.UpsilonInv = Para.tLInv * LInv;
+  Para.SigmaInv = Para.DInv * Para.UpsilonInv * Para.DInv;
+  Para.GradLZ = arma::diagmat(Para.LoverZ);
+  Para.GradZl = arma::diagmat(arma::pow(arma::cosh(l), -2));
+  Para.GradLl = Para.GradLZ * Para.GradZl;
+  Para.Omega = arma::join_cols(Para.Beta, Para.l, Para.d);
+  
+  //Return final object
+  return std::pair<para, tuning>(Para, TuningObj);
+  
+}
+
+
+
+//Sample D using a Metropolis step------------------------------------------------
+std::pair<para, tuning> UpdateD(datobj DatObj, hypara HyPara, tuning TuningObj, para Para) {
+  
+  //Set data objects
+  arma::mat EyeQ = DatObj.EyeQ;
+  int Q = DatObj.Q;
+  int NUnits = DatObj.NUnits;
+  
+  //Set hyperparameter objects
+  double Nu = HyPara.Nu;
+  
+  //Set Metropolis Tuning Objects
+  arma::vec MetropD = TuningObj.MetropD;
+  arma::vec AcceptanceD = TuningObj.AcceptanceD;
+  
+  //Set parameter objects
+  arma::vec d = Para.d;
+  arma::mat LInv = Para.LInv;
+  arma::mat Gamma = Para.Gamma;
+  arma::mat DInv = Para.DInv;
+  
+  //Loop over visits
+  for (int k = 0; k < Q; k++) {
+    
+    //Numerical fix for when d becomes too large
+    arma::vec dProposal = d;
+    arma::mat DInvProposal;
+    double dkProposal;
+    double sigmakProposal = arma::datum::inf;
+    while (!arma::is_finite(sigmakProposal)) {
+  
+      //Sample proposal
+      dkProposal = arma::as_scalar(rnormRcpp(1, d(k), sqrt(MetropD(k))));
+      dProposal(k) = dkProposal;
+      sigmakProposal = exp(dkProposal);
+      
+      //Update DInv
+      DInvProposal = arma::diagmat(arma::exp(-dProposal));
+      
+    }
+    
+    //Random Effect Component (Rooti is the cholesky of the inverse of Sigma)
+    arma::mat RootiProposal = LInv * DInvProposal;
+    arma::mat Rooti = LInv * DInv;
+    double Component1A = 0;
+    double Component1B = 0;
+    for (arma::uword i = 0; i < NUnits; i++) {
+      Component1A += lndMvn(Gamma.col(i), arma::zeros(Q), RootiProposal);
+      Component1B += lndMvn(Gamma.col(i), arma::zeros(Q), Rooti);
+    }
+    double Component1 = Component1A - Component1B;
+    
+    //Prior components
+    double Component2A = dkProposal - 0.5 * (Nu + 1) * log(1 + exp(2 * dkProposal) / Nu);
+    double Component2B = d(k) - 0.5 * (Nu + 1) * log(1 + exp(2 * d(k)) / Nu);
+    double Component2 = Component2A - Component2B;
+    
+    // Rcpp::Rcout << std::fixed << Component1 << " " << Component2 << std::endl;
+    
+    //Log acceptance ratio
+    double LogR = Component1 + Component2;
+    
+    //Metropolis update
+    double RandU = randuRcpp();
+    if (log(RandU) < LogR) {
+      
+      //Keep count of acceptances
+      AcceptanceD(k)++;
+      
+      //Update parameters output
+      d = dProposal;
+      DInv = DInvProposal;
+      
+    }
+    
+    //End loop over L entries
+  }
+  
+  //Update Metropolis object
+  TuningObj.AcceptanceD = AcceptanceD;
+  
+  //Update Para objects
+  Para.d = d;
+  Para.D = arma::diagmat(arma::exp(d));
+  Para.Sigma = Para.D * Para.Upsilon * Para.D;
+  Para.DInv = DInv;
+  Para.SigmaInv = Para.DInv * Para.UpsilonInv * Para.DInv;
+  Para.Omega = arma::join_cols(Para.Beta, Para.l, Para.d);
+  
+  
+  //Return final object
+  return std::pair<para, tuning>(Para, TuningObj);
+  
+}
+
+
+
 //Function to compute the SGLD correction
 para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive) {
   

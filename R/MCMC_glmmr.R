@@ -16,7 +16,7 @@
 #'  include: \code{"normal"}, \code{"binomial"}, and \code{"poisson"}.
 #'  
 #' @param algorithm Character string indicating the algorithm to be used. Options
-#'  include: \code{"sgd"}, \code{"sgld"}, and \code{"sgld_corrected"}.
+#'  include: \code{"sgd"}, \code{"sgld"}, \code{"sgld_corrected"}, and \code{"gibbs"}.
 #'  
 #' @param starting Either \code{NULL} or a \code{list} containing starting values
 #'  to be specified for the MCMC sampler. If \code{NULL} is not chosen then none, some or all
@@ -56,7 +56,7 @@
 #'  
 #'  \code{S}: The size of the mini-batches. (default = 10 percent of the groups or 10, whichever is smaller)
 #'  
-#'  \code{NEpochs}: The number of epochs in the NADAM phase. (default =
+#'  \code{NEpochs}: The number of epochs in the NADAM phase. If using the \code{gibbs} algorithm, this number is the size of the burn-in samples. (default =
 #'  \code{1,000})
 #'  
 #'  \code{R}: The number of MCMC samples to draw to sample the random effects. (default = 500)
@@ -71,7 +71,14 @@
 #'  \code{NThin}: Value such that during the SGLD phase, only every
 #'  \code{NThin}-th scan is recorded for use in posterior inference (For return values
 #'  we define, NKeep = NSims / NThin (default = \code{1}).
-#'
+#'  
+#'  \code{NPilot}: If using the \code{gibbs} algorithm, the number of times during the burn-in phase that pilot adaptation
+#'  is performed. (default = \code{20})
+#'  
+#'  \code{TuneL}: If using the \code{gibbs} algorithm, the tuning variances for \code{l} in the Metropolis step. Either a scalar or an \code{NL} dimensional vector. (default = 1)
+#'  
+#'  \code{TuneD}: If using the \code{gibbs} algorithm, the tuning variances for \code{d} in the Metropolis step. Either a scalar or an \code{Q} dimensional vector. (default = 1)
+#'  
 #' @param seed An integer value used to set the seed for the random number generator
 #'  (default = 54).
 #'  
@@ -130,7 +137,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   # group = "id"
   # data = dat
   # family = "bernoulli"
-  # algorithm = "sgld_corrected"
+  # algorithm = "gibbs"
   # starting = NULL
   # hypers = NULL
   # tuning = list(NSims = 1000, NEpochs = 1000, S = 1)
@@ -171,10 +178,15 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   OmegaMAP <- RegObj$map
   Omega <- RegObj$samples
   
+  ###Set metropolis objec
+  MetropRcpp <- RegObj$metropolis
+  
   ###Collect output to be returned
   DatObjOut <- OutputDatObj(DatObj)
   Samples <- FormatSamples(DatObj, Omega)
-
+  Metropolis <- NULL
+  if (algorithm == "gibbs") Metropolis <- SummarizeMetropolis(DatObj, TuningObj, MetropRcpp)
+    
   ###Return spBFA object
   glmmr <- list(beta = Samples$Beta,
                 l = Samples$l,
@@ -183,7 +195,8 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
                 sigma = Samples$Sigma,
                 map = OmegaMAP,
                 datobj = DatObjOut,
-                runtime = paste0("Model runtime: ", round(RunTime, 2), " ", attr(RunTime, "units")))
+                metropolis = Metropolis,
+                runtime = RunTime)
   glmmr <- structure(glmmr, class = "glmmr")
   return(glmmr)
 
