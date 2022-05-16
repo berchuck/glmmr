@@ -63,6 +63,8 @@
 #'
 #'  \code{EpsilonSGLD}: Epsilon value in the SGLD algorithm. (default = 0.01)
 #'  
+#'  \code{EpsilonSGLDCorrected}: Positive number that is used to divide the epsilon value in the SGLD corrected algorithm. (default = 100)
+#'  
 #'  \code{S_SGLD}: The number of groups that are randomly sampled to compute the SGLD correction. (default = total number of groups)
 #'  
 #'  \code{NSims}: The number of SGLD scans for which to perform the
@@ -81,6 +83,8 @@
 #'  
 #' @param seed An integer value used to set the seed for the random number generator
 #'  (default = 54).
+#'  
+#' @param timer An integer value indicating the number of seconds the algorithm should be run (default = NULL). If a value is specificed the algorithm will disregard the \code{NSims} and run until the value is reached.
 #'  
 #' @details Details of the underlying statistical model proposed by
 #'  Berchuck et al. 2019. are forthcoming.
@@ -129,7 +133,7 @@
 #' @references Reference for Berchuck et al. 2022 is forthcoming.
 #' @export
 glmmr <- function(pformula, gformula, group, data, family = "binomial", algorithm = "sgld_corrected",
-                  starting = NULL, hypers = NULL, tuning = NULL, seed = 54) {
+                  starting = NULL, hypers = NULL, tuning = NULL, seed = 54, timer = NULL) {
   
   ###Function Inputs
   # pformula = y ~ 1 + time
@@ -137,11 +141,12 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   # group = "id"
   # data = dat
   # family = "bernoulli"
-  # algorithm = "gibbs"
+  # algorithm = "sgld_corrected"
   # starting = NULL
   # hypers = NULL
-  # tuning = list(NSims = 1000, NEpochs = 1000, S = 1)
+  # tuning = list(NSims = 1000, NEpochs = 250, S = 1, EpsilonSGLDCorrected = 10000)
   # seed = 54
+  # timer = 60 * 3
 
   ###Check for missing objects
   if (missing(pformula)) stop("pformula: missing")
@@ -150,7 +155,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   if (missing(data)) stop("data: missing")
 
   ###Check model inputs
-  CheckInputs(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed)
+  CheckInputs(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed, timer)
 
   ####Set seed for reproducibility
   set.seed(seed)
@@ -159,7 +164,7 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   Interactive <- interactive()
 
   ###Create objects for use in sampler
-  DatObj <- CreateDatObj(pformula, gformula, group, data, family, algorithm)
+  DatObj <- CreateDatObj(pformula, gformula, group, data, family, algorithm, timer)
   HyPara <- CreateHyPara(hypers) 
   TuningObj <- CreateTuningObj(tuning, DatObj)
   Para <- CreatePara(starting, DatObj)
@@ -177,16 +182,39 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   ###Set regression objects
   OmegaMAP <- RegObj$map
   Omega <- RegObj$samples
+  epsilon <- RegObj$epsilon
+  TuningObj$EpsilonSGLD <- epsilon
   
   ###Set metropolis objec
   MetropRcpp <- RegObj$metropolis
   
+  ###Timer object
+  Timer <- RegObj$timer
+  LastIndex <- which.max(Timer == 0) - 1
+  TimerOut <- NULL
+  if (!is.null(timer)) {
+    if (algorithm != "sgd") {
+      TimerOut <- data.frame(stage = c(rep("burnin", TuningObj$NEpochs), rep("sampling", TuningObj$NSims))[1:LastIndex],
+                          iteration = 1:LastIndex,
+                          seconds = Timer[1:LastIndex])
+    }
+    if (algorithm == "sgd") {
+      TimerOut <- data.frame(stage = c(rep("sgd", TuningObj$NEpochs))[1:LastIndex],
+                          iteration = 1:LastIndex,
+                          seconds = Timer[1:LastIndex])
+    }
+  }
+  
   ###Collect output to be returned
   DatObjOut <- OutputDatObj(DatObj)
+  if (!is.null(timer)) Omega <- Omega[, 1:LastIndex]
   Samples <- FormatSamples(DatObj, Omega)
   Metropolis <- NULL
-  if (algorithm == "gibbs") Metropolis <- SummarizeMetropolis(DatObj, TuningObj, MetropRcpp)
-    
+  if (algorithm == "gibbs") {
+    Metropolis <- SummarizeMetropolis(DatObj, TuningObj, MetropRcpp)
+    if (!is.null(timer)) Metropolis[, 1] <- (Metropolis[, 1] * TuningObj$NSims) / (LastIndex - TuningObj$NEpochs)
+  }
+  
   ###Return spBFA object
   glmmr <- list(beta = Samples$Beta,
                 l = Samples$l,
@@ -195,8 +223,12 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
                 sigma = Samples$Sigma,
                 map = OmegaMAP,
                 datobj = DatObjOut,
+                tuningobj = TuningObj,
+                hypara = HyPara,
+                starting = Para$Omega,
                 metropolis = Metropolis,
-                runtime = RunTime)
+                runtime = RunTime,
+                timer = TimerOut)
   glmmr <- structure(glmmr, class = "glmmr")
   return(glmmr)
 

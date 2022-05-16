@@ -29,6 +29,7 @@ struct datobj {
   arma::Col<int> SeqNUnits;
   arma::colvec ProbNUnits;
   int NOmega;
+  int Timer;
 };
 struct hypara {
   double Eta;
@@ -46,6 +47,7 @@ struct tuning {
   int NEpochs;
   int R;
   double EpsilonSGLD;
+  double EpsilonSGLDCorrected;
   int NSims;
   int NTotal;
   int NKeep;
@@ -85,6 +87,7 @@ struct para {
   arma::mat GradZl;
   arma::mat GradLl;
   arma::mat SigmaPrime;
+  arma::mat SigmaSGLD;
   arma::vec omega;
   arma::mat Gamma;
 };
@@ -116,7 +119,7 @@ para ConvertPara(Rcpp::List Para_List);
 
 //UTILITY FUNCTIONS
 tuning PilotAdaptation(datobj DatObj, tuning TuningObj);
-para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive);
+std::pair<para, tuning> ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive);
 para UpdatePara(datobj DatObj, para Para);
 std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatObj, tuning TuningObj, para Para);
 arma::rowvec get_grad_1_L(arma::mat const& L, int q);

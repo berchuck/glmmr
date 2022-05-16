@@ -386,7 +386,7 @@ std::pair<para, tuning> UpdateD(datobj DatObj, hypara HyPara, tuning TuningObj, 
 
 
 //Function to compute the SGLD correction
-para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive) {
+std::pair<para, tuning> ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Interactive) {
   
   //Set data objects
   int NUnits = DatObj.NUnits;
@@ -396,8 +396,9 @@ para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Inte
   //Set tuning objects
   arma::vec WhichSGLDProgress = TuningObj.WhichSGLDProgress;
   arma::vec WhichSGLDProgressInt = TuningObj.WhichSGLDProgressInt;
-  double EpsilonSGLD = TuningObj.EpsilonSGLD;
+  double EpsilonSGLDCorrected = TuningObj.EpsilonSGLDCorrected;
   int S_SGLD = TuningObj.S_SGLD;
+  int S = TuningObj.S;
   
   //User output
   BeginSGLDProgress(TuningObj, Interactive);
@@ -414,10 +415,23 @@ para ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, para Para, bool Inte
     if (!Interactive) if (std::find(WhichSGLDProgressInt.begin(), WhichSGLDProgressInt.end(), i) != WhichSGLDProgressInt.end())
       UpdateSGLDBarInt(i, TuningObj);
   }
-  arma::mat SigmaPrime = arma::chol(SigmaSum) / sqrt(S_SGLD);
+  arma::mat SigmaPrime = arma::chol(SigmaSum) / sqrt(S);
+  
+  //Compute EpsilonSGLD
+  arma::cx_vec eigval = arma::eig_gen(SigmaPrime);
+  arma::vec eigvalvec = arma::real(arma::sort(eigval, "descend"));
+  double lambda_max = arma::as_scalar(eigvalvec(0));
+  double EpsilonSGLDMax = 2 / (lambda_max * lambda_max); // maximum epsilon allowed
+  double EpsilonSGLD = EpsilonSGLDMax / EpsilonSGLDCorrected;
+
+  //Compute 
   arma::mat Sigma = sqrt(2) * EyeNOmega - sqrt(EpsilonSGLD) * SigmaPrime;
-  Para.SigmaPrime = EpsilonSGLD * Sigma * Sigma.t();
-  return Para;
+  
+  //Output
+  Para.SigmaPrime = SigmaPrime;
+  Para.SigmaSGLD = EpsilonSGLD * Sigma * Sigma.t();
+  TuningObj.EpsilonSGLD = EpsilonSGLD;
+  return std::pair<para, tuning>(Para, TuningObj);
   
 }
 
@@ -603,7 +617,7 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   if (AlgorithmInd > 0) {
     if (e >= NEpochs) {
       if (AlgorithmInd == 1) Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
-      if (AlgorithmInd == 2) Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaPrime); // SGLD with correction
+      if (AlgorithmInd == 2) Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaSGLD); // SGLD with correction
     }
   }
   //Update parameter object

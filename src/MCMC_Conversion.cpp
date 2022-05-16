@@ -22,6 +22,7 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   int AlgorithmInd = DatObj_List["AlgorithmInd"];
   arma::mat EyeQ = DatObj_List["EyeQ"];
   arma::mat EyeNOmega = DatObj_List["EyeNOmega"];
+  int Timer = DatObj_List["Timer"];
   arma::Col<int> SeqNUnits = arma::linspace<arma::Col<int>>(1, NUnits, NUnits);
   arma::colvec ProbNUnits = arma::ones<arma::colvec>(NUnits) / NUnits;
   
@@ -52,6 +53,7 @@ datobj ConvertDatObj(Rcpp::List DatObj_List) {
   DatObj.SeqNUnits = SeqNUnits;
   DatObj.ProbNUnits = ProbNUnits;
   DatObj.NOmega = NOmega;
+  DatObj.Timer = Timer;
   return DatObj;
 
 }
@@ -90,6 +92,7 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   int NEpochs = TuningObj_List["NEpochs"];
   int R = TuningObj_List["R"];
   double EpsilonSGLD = TuningObj_List["EpsilonSGLD"];
+  double EpsilonSGLDCorrected = TuningObj_List["EpsilonSGLDCorrected"];
   int NSims = TuningObj_List["NSims"];
   int NKeep = TuningObj_List["NKeep"];
   int NTotal = TuningObj_List["NTotal"];
@@ -122,6 +125,7 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.NEpochs = NEpochs;
   TuningObj.R = R;
   TuningObj.EpsilonSGLD = EpsilonSGLD;
+  TuningObj.EpsilonSGLDCorrected = EpsilonSGLDCorrected;
   TuningObj.NSims = NSims;
   TuningObj.NKeep = NKeep;
   TuningObj.NTotal = NTotal;

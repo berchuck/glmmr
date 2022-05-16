@@ -23,6 +23,7 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   int NOmega = DatObj.NOmega;
   int NKeep = TuningObj.NKeep;
   int AlgorithmInd = DatObj.AlgorithmInd;
+  int Timer = DatObj.Timer;
   arma::Col<int> SeqNUnits = DatObj.SeqNUnits;
   arma::colvec ProbNUnits = DatObj.ProbNUnits;
   arma::vec WhichKeep = TuningObj.WhichKeep;
@@ -40,9 +41,12 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   int Id;
   arma::mat OmegaMat(NOmega, NKeep), GammaI(DatObj.Q, TuningObj.R);
   arma::colvec GradLikelihood(NOmega), GradPrior(NOmega), Grad(NOmega);
-  arma::colvec OmegaMAP(NOmega);
+  arma::colvec OmegaMAP(NOmega), TimerOut(NKeep);
   arma::uvec Samps(S);
-  
+  arma::wall_clock timer;
+  timer.tic();
+  double secs;  
+
   //Loop over epochs
   for (arma::uword e = 0; e < NTotal; e++) {
 
@@ -132,9 +136,12 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       UpdateMAPBarInt(e, TuningObj);
     
     //Compute SGLD Correction
-    if (AlgorithmInd == 2 & e == (NEpochs - 1)) 
-      Para = ComputeSGLDCorrection(DatObj, TuningObj, Para, Interactive);
-    
+    if (AlgorithmInd == 2 & e == (NEpochs - 1)) {
+      Update = ComputeSGLDCorrection(DatObj, TuningObj, Para, Interactive);
+      Para = Update.first;
+      TuningObj = Update.second;
+    }
+  
     //Update SGMCMC progress bar
     if (AlgorithmInd > 0) { // sgld and sgld_corrected
       if (e == (NEpochs - 1)) BeginSamplerProgress(TuningObj, Interactive);
@@ -143,6 +150,16 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       if (!Interactive) if (std::find(WhichSamplerProgressInt.begin(), WhichSamplerProgressInt.end(), e) != WhichSamplerProgressInt.end())
         UpdateSamplerBarInt(e, TuningObj);
     }
+    
+    //Check to see if the sampler should break
+    secs = timer.toc();
+    TimerOut(e) = secs;
+    if (Timer > 0) {
+      if (secs > Timer) {
+        break;
+      }
+    }
+    
     
   //End loop over epochs
   }
@@ -154,7 +171,9 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   //Return raw samples
   return Rcpp::List::create(Rcpp::Named("map") = OmegaMAP, 
                            Rcpp::Named("samples") = OmegaMat,
-                           Rcpp::Named("metropolis") = Metropolis);
+                           Rcpp::Named("metropolis") = Metropolis,
+                           Rcpp::Named("timer") = TimerOut,
+                           Rcpp::Named("epsilon") = TuningObj.EpsilonSGLD);
 
 //End MCMC sampler function
 }

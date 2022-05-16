@@ -15,7 +15,8 @@ glmmr(
   starting = NULL,
   hypers = NULL,
   tuning = NULL,
-  seed = 54
+  seed = 54,
+  timer = NULL
 )
 }
 \arguments{
@@ -80,6 +81,8 @@ include: \code{"sgd"}, \code{"sgld"}, \code{"sgld_corrected"}, and \code{"gibbs"
 
  \code{EpsilonSGLD}: Epsilon value in the SGLD algorithm. (default = 0.01)
  
+ \code{EpsilonSGLDCorrected}: Positive number that is used to divide the epsilon value in the SGLD corrected algorithm. (default = 100)
+ 
  \code{S_SGLD}: The number of groups that are randomly sampled to compute the SGLD correction. (default = total number of groups)
  
  \code{NSims}: The number of SGLD scans for which to perform the
@@ -98,6 +101,8 @@ include: \code{"sgd"}, \code{"sgld"}, \code{"sgld_corrected"}, and \code{"gibbs"
 
 \item{seed}{An integer value used to set the seed for the random number generator
 (default = 54).}
+
+\item{timer}{An integer value indicating the number of seconds the algorithm should be run (default = NULL). If a value is specificed the algorithm will disregard the \code{NSims} and run until the value is reached.}
 }
 \value{
 \code{glmmr} returns a list containing the following objects. Note that 

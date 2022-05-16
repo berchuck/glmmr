@@ -1,4 +1,4 @@
-CheckInputs <- function(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed) {
+CheckInputs <- function(pformula, gformula, group, data, family, algorithm, starting, hypers, tuning, seed, timer) {
   
   ###Data dimensions
   N <- nrow(data)
@@ -51,6 +51,14 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   if (any(is.na(group_dat))) stop('"group" variable cannot contain missing values')
   if (any(is.infinite(group_dat))) stop('"group" variable cannot contain infinite values')
   
+  ###Timer
+  if (!is.null(timer)) {
+    if (!is.scalar(timer)) stop('timer must be a scalar')
+    if (is.na(timer)) stop('timer cannot be NA')
+    if (!is.finite(timer)) stop('timer cannot be infinite')
+    if (!is.wholenumber(timer) | timer <= 0) stop('timer must be a positive integer')
+  }
+    
   ###hypers
   if (!is.null(hypers)) {
     if (!is.list(hypers)) stop('hypers must be a list')
@@ -136,7 +144,7 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   ###Tuning Values
   if (!is.null(tuning)) {
     if (!is.list(tuning)) stop('tuning must be a list')
-    if (!all(names(tuning) %in% c("NPilot", "TuneD", "TuneL", "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin", "NPilot", "TuneL", or "TuneD"')
+    if (!all(names(tuning) %in% c("NPilot", "TuneD", "TuneL", "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "EpsilonSGLDCorrected", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "EpsilonSGLDCorrected", "NSims", "NThin", "NPilot", "TuneL", or "TuneD"')
     
     ###If L tuning values are provided
     if ("TuneL" %in% names(tuning)) {

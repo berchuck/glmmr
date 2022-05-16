@@ -1,5 +1,5 @@
 ###Function for reading in sampler inputs and creating a list object that contains all relevant data objects--------------------
-CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
+CreateDatObj <- function(pformula, gformula, group, data, family, algorithm, timer) {
 
   ###Extract group and convert to ordered integers
   dat_group <- dat[, group]
@@ -44,6 +44,10 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
   if (algorithm == "sgld_corrected") AlgorithmInd <- 2
   if (algorithm == "gibbs") AlgorithmInd <- 3
   
+  ###Timer
+  if (is.null(timer)) Timer <- -1
+  if (!is.null(timer)) Timer <- timer
+  
   ###Make parameters global
   DatObj <- list()
   DatObj$Y <- Y
@@ -63,6 +67,7 @@ CreateDatObj <- function(pformula, gformula, group, data, family, algorithm) {
   DatObj$AlgorithmInd <- AlgorithmInd
   DatObj$EyeQ <- EyeQ
   DatObj$EyeNOmega <- EyeNOmega
+  DatObj$Timer <- Timer
   return(DatObj)
 
 }
@@ -110,6 +115,7 @@ CreateTuningObj <- function(tuning, DatObj) {
   NL <- DatObj$NL
   NUnits <- DatObj$NUnits
   AlgorithmInd <- DatObj$AlgorithmInd
+  Timer <- DatObj$Timer
   
   ###Which parameters are user defined?
   UserTuning <- names(tuning)
@@ -135,6 +141,8 @@ CreateTuningObj <- function(tuning, DatObj) {
   ###Sampling
   if ("EpsilonSGLD" %in% UserTuning) EpsilonSGLD <- tuning$EpsilonSGLD
   if (!("EpsilonSGLD" %in% UserTuning)) EpsilonSGLD <- 0.01
+  if ("EpsilonSGLDCorrected" %in% UserTuning) EpsilonSGLDCorrected <- tuning$EpsilonSGLDCorrected
+  if (!("EpsilonSGLDCorrected" %in% UserTuning)) EpsilonSGLDCorrected <- 100
   if ("NSims" %in% UserTuning) NSims <- tuning$NSims
   if (!("NSims" %in% UserTuning)) NSims <- 5000
   if ("NThin" %in% UserTuning) NThin <- tuning$NThin
@@ -176,6 +184,38 @@ CreateTuningObj <- function(tuning, DatObj) {
   AcceptanceL <- rep(0, NL)
   AcceptanceD <- rep(0, Q)
   
+  ###Change sampler inputs if the run is to be timed
+  if (!is.null(Timer) & AlgorithmInd > 0) {
+    NSims <- 1000000
+    NEpochs <- NEpochs
+    NTotal <- NSims + NEpochs
+    WhichKeep <- 1:NTotal - 1
+    NKeep <- length(WhichKeep)
+    ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
+    SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
+    WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
+    WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
+    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
+    WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
+    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
+  }
+  if (!is.null(Timer) & AlgorithmInd == 0) {
+    NSims <- 0
+    NEpochs <- 1000000
+    NTotal <- NSims + NEpochs
+    WhichKeep <- 1:NTotal - 1
+    NKeep <- length(WhichKeep)
+    ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
+    SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
+    WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
+    WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
+    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
+    WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
+    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
+  }
+
   ###Return SGD object
   TuningObj <- list()
   TuningObj$EpsilonNADAM <- EpsilonNADAM
@@ -189,9 +229,10 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$NEpochs <- NEpochs
   TuningObj$R <- R
   TuningObj$EpsilonSGLD <- EpsilonSGLD
+  TuningObj$EpsilonSGLDCorrected <- EpsilonSGLDCorrected
   TuningObj$NSims <- NSims
   TuningObj$NThin <- NThin
-  TuningObj$NTotal <- NSims + NEpochs
+  TuningObj$NTotal <- NTotal
   TuningObj$WhichKeep <- WhichKeep
   TuningObj$NKeep <- NKeep
   TuningObj$BarLength <- BarLength
