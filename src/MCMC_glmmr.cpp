@@ -18,6 +18,7 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   //Set objects to be used in the for loop
   int NEpochs = TuningObj.NEpochs;
   int NTotal = TuningObj.NTotal;
+  int NTune = TuningObj.NTune;
   int NUnits = DatObj.NUnits;
   int S = TuningObj.S;
   int NOmega = DatObj.NOmega;
@@ -31,6 +32,8 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
   arma::vec WhichMAPProgressInt = TuningObj.WhichMAPProgressInt;
   arma::vec WhichSamplerProgress = TuningObj.WhichSamplerProgress;
   arma::vec WhichSamplerProgressInt = TuningObj.WhichSamplerProgressInt;
+  arma::vec WhichTuneProgress = TuningObj.WhichTuneProgress;
+  arma::vec WhichTuneProgressInt = TuningObj.WhichTuneProgressInt;
   arma::vec WhichPilotAdapt = TuningObj.WhichPilotAdapt;
   std::pair<para, tuning> Update;
   
@@ -88,6 +91,15 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       //Update other parameters
       Para = UpdatePara(DatObj, Para);
     
+      //Update Tune progress bar
+      if (AlgorithmInd > 0) { // sgld and sgld_corrected
+        if (e == NEpochs) BeginTuneProgress(TuningObj, Interactive);
+        if (Interactive) if (std::find(WhichTuneProgress.begin(), WhichTuneProgress.end(), e) != WhichTuneProgress.end())
+          UpdateTuneBar(e, TuningObj);
+        if (!Interactive) if (std::find(WhichTuneProgressInt.begin(), WhichTuneProgressInt.end(), e) != WhichTuneProgressInt.end())
+          UpdateTuneBarInt(e, TuningObj);
+      }
+    
     //End if statement over gradient algorithms
     }
     
@@ -119,7 +131,7 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
     if (AlgorithmInd == 0) { // sgd
       OmegaMat.col(e) = Para.Omega;
     }
-    if (e == (NEpochs - 1)) OmegaMAP = Para.Omega;
+    if (e == (NEpochs - 2)) OmegaMAP = Para.Omega;
     if (AlgorithmInd > 0) { // sgld, sgld_corrected, gibbs
       if (std::find(WhichKeep.begin(), WhichKeep.end(), e) != WhichKeep.end())
         OmegaMat.cols(find(e == WhichKeep)) = Para.Omega;
@@ -134,6 +146,15 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       UpdateMAPBar(e, TuningObj, AlgorithmInd);
     if (!Interactive) if (std::find(WhichMAPProgressInt.begin(), WhichMAPProgressInt.end(), e) != WhichMAPProgressInt.end())
       UpdateMAPBarInt(e, TuningObj);
+  
+    //Update SGMCMC progress bar
+    if (AlgorithmInd > 0) { // sgld and sgld_corrected
+      if (e == (NEpochs + NTune)) BeginSamplerProgress(TuningObj, Interactive);
+      if (Interactive) if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
+        UpdateSamplerBar(e, TuningObj);
+      if (!Interactive) if (std::find(WhichSamplerProgressInt.begin(), WhichSamplerProgressInt.end(), e) != WhichSamplerProgressInt.end())
+        UpdateSamplerBarInt(e, TuningObj);
+    }
     
     //Compute SGLD Correction
     if (AlgorithmInd == 2 & e == (NEpochs - 1)) {
@@ -141,25 +162,15 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
       Para = Update.first;
       TuningObj = Update.second;
     }
-  
-    //Update SGMCMC progress bar
-    if (AlgorithmInd > 0) { // sgld and sgld_corrected
-      if (e == (NEpochs - 1)) BeginSamplerProgress(TuningObj, Interactive);
-      if (Interactive) if (std::find(WhichSamplerProgress.begin(), WhichSamplerProgress.end(), e) != WhichSamplerProgress.end())
-        UpdateSamplerBar(e, TuningObj);
-      if (!Interactive) if (std::find(WhichSamplerProgressInt.begin(), WhichSamplerProgressInt.end(), e) != WhichSamplerProgressInt.end())
-        UpdateSamplerBarInt(e, TuningObj);
-    }
     
     //Check to see if the sampler should break
-    secs = timer.toc();
-    TimerOut(e) = secs;
     if (Timer > 0) {
+      secs = timer.toc();
+      TimerOut(e) = secs;
       if (secs > Timer) {
         break;
       }
     }
-    
     
   //End loop over epochs
   }
@@ -173,7 +184,9 @@ Rcpp::List glmmr_Rcpp(Rcpp::List DatObj_List,  Rcpp::List HyPara_List,
                            Rcpp::Named("samples") = OmegaMat,
                            Rcpp::Named("metropolis") = Metropolis,
                            Rcpp::Named("timer") = TimerOut,
-                           Rcpp::Named("epsilon") = TuningObj.EpsilonSGLD);
+                           Rcpp::Named("epsilon") = TuningObj.EpsilonSGLD,
+                           Rcpp::Named("counter") = TuningObj.Counter,
+                           Rcpp::Named("epsilontunecounter") = TuningObj.EpsilonTuneCounter);
 
 //End MCMC sampler function
 }

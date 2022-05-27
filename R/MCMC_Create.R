@@ -141,14 +141,16 @@ CreateTuningObj <- function(tuning, DatObj) {
   ###Sampling
   if ("EpsilonSGLD" %in% UserTuning) EpsilonSGLD <- tuning$EpsilonSGLD
   if (!("EpsilonSGLD" %in% UserTuning)) EpsilonSGLD <- 0.01
-  if ("EpsilonSGLDCorrected" %in% UserTuning) EpsilonSGLDCorrected <- tuning$EpsilonSGLDCorrected
-  if (!("EpsilonSGLDCorrected" %in% UserTuning)) EpsilonSGLDCorrected <- 100
   if ("NSims" %in% UserTuning) NSims <- tuning$NSims
   if (!("NSims" %in% UserTuning)) NSims <- 5000
   if ("NThin" %in% UserTuning) NThin <- tuning$NThin
   if (!("NThin" %in% UserTuning)) NThin <- 1
   if ("NPilot" %in% UserTuning) NPilot <- tuning$NPilot
   if (!("NPilot" %in% UserTuning)) NPilot <- 20
+  if ("NTune" %in% UserTuning) NTune <- tuning$NTune
+  if (!("NTune" %in% UserTuning)) NTune <- 100
+  if ("NTune_seconds" %in% UserTuning) NTune_seconds <- tuning$NTune_seconds
+  if (!("NTune_seconds" %in% UserTuning)) NTune_seconds <- 1
   
   ###Metropolis tuning
   if ("TuneL" %in% UserTuning) MetropL <- numeric(tuning$TuneL, length = NL)
@@ -166,54 +168,63 @@ CreateTuningObj <- function(tuning, DatObj) {
   PilotAdaptDenominator <- WhichPilotAdapt[1] + 1
   
   ###Burn-in progress bar
-  WhichKeep <- NEpochs + (1:(NSims / NThin)) * NThin - 1
+  WhichKeep <- NEpochs + NTune + (1:(NSims / NThin)) * NThin - 1
   NKeep <- length(WhichKeep)
   BarLength <- 50 #Burn-in bar length (arbitrary)
   ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
   SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
   WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
   WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
-  WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+  WhichTuneProgress <- sapply(ProgressBar, function(x) tail(which(1 : NTune <= x * NTune), 1)) + NEpochs - 1
+  WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NTune + NEpochs - 1
   WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
   WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
-  WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
+  WhichTuneProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NTune <= x * NTune), 1)) + NEpochs - 1
+  WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NTune + NEpochs - 1
   if (AlgorithmInd == 0) NSims <- 0
+  if (AlgorithmInd == 0) NTune <- 0
   if (AlgorithmInd == 0) NKeep <- NEpochs
+  NTotal <- NSims + NTune + NEpochs
   
   ###Set acceptance rate counters
   AcceptanceL <- rep(0, NL)
   AcceptanceD <- rep(0, Q)
   
   ###Change sampler inputs if the run is to be timed
-  if (!is.null(Timer) & AlgorithmInd > 0) {
+  if ((Timer >= 0) & AlgorithmInd > 0) {
     NSims <- 1000000
     NEpochs <- NEpochs
-    NTotal <- NSims + NEpochs
+    NTotal <- NSims + NEpochs + NTune
     WhichKeep <- 1:NTotal - 1
     NKeep <- length(WhichKeep)
     ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
     SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
     WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
     WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
-    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichTuneProgress <- sapply(ProgressBar, function(x) tail(which(1 : NTune <= x * NTune), 1)) + NEpochs - 1
+    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NTune + NEpochs - 1
     WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
     WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
-    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichTuneProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NTune <= x * NTune), 1)) + NEpochs - 1
+    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NTune + NEpochs - 1
   }
-  if (!is.null(Timer) & AlgorithmInd == 0) {
+  if ((Timer >= 0) & AlgorithmInd == 0) {
     NSims <- 0
+    NTune <- 0
     NEpochs <- 1000000
-    NTotal <- NSims + NEpochs
+    NTotal <- NTune + NSims + NEpochs
     WhichKeep <- 1:NTotal - 1
     NKeep <- length(WhichKeep)
     ProgressBar <- seq(1 / BarLength, 1, 1 / BarLength)
     SamplerProgress <- seq(0.1, 1.0, 0.1) #Intervals of progress update (arbitrary)
     WhichMAPProgress <- sapply(ProgressBar, function(x) tail(which(1 : NEpochs <= x * NEpochs), 1)) - 1
     WhichSGLDProgress <- sapply(ProgressBar, function(x) tail(which(1 : S_SGLD <= x * S_SGLD), 1)) - 1
-    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichTuneProgress <- sapply(ProgressBar, function(x) tail(which(1 : NTune <= x * NTune), 1)) + NEpochs - 1
+    WhichSamplerProgress <- sapply(ProgressBar, function(x) tail(which(1 : NSims <= x * NSims), 1)) + NTune + NEpochs - 1
     WhichMAPProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NEpochs <= x * NEpochs), 1)) - 1
     WhichSGLDProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:S_SGLD <= x * S_SGLD), 1)) - 1
-    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NEpochs - 1
+    WhichTuneProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NTune <= x * NTune), 1)) + NEpochs - 1
+    WhichSamplerProgressInt <- sapply(SamplerProgress, function(x) tail(which(1:NSims <= x * NSims), 1)) + NTune + NEpochs - 1
   }
 
   ###Return SGD object
@@ -229,10 +240,11 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$NEpochs <- NEpochs
   TuningObj$R <- R
   TuningObj$EpsilonSGLD <- EpsilonSGLD
-  TuningObj$EpsilonSGLDCorrected <- EpsilonSGLDCorrected
   TuningObj$NSims <- NSims
   TuningObj$NThin <- NThin
   TuningObj$NTotal <- NTotal
+  TuningObj$NTune <- NTune
+  TuningObj$NTune_seconds <- NTune_seconds
   TuningObj$WhichKeep <- WhichKeep
   TuningObj$NKeep <- NKeep
   TuningObj$BarLength <- BarLength
@@ -242,6 +254,8 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$WhichSamplerProgressInt <- WhichSamplerProgressInt
   TuningObj$WhichSGLDProgress <- WhichSGLDProgress
   TuningObj$WhichSGLDProgressInt <- WhichSGLDProgressInt
+  TuningObj$WhichTuneProgress <- WhichTuneProgress
+  TuningObj$WhichTuneProgressInt <- WhichTuneProgressInt
   TuningObj$WhichPilotAdapt <- WhichPilotAdapt
   TuningObj$PilotAdaptDenominator <- PilotAdaptDenominator
   TuningObj$MetropL <- MetropL
@@ -249,6 +263,8 @@ CreateTuningObj <- function(tuning, DatObj) {
   TuningObj$MetropD <- MetropD
   TuningObj$AcceptanceD <- AcceptanceD
   TuningObj$OriginalTuners <- c(MetropL, MetropD)
+  TuningObj$Counter <- 0
+  TuningObj$EpsilonTuneCounter <- 0
   return(TuningObj)
   
 }

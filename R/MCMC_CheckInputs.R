@@ -144,7 +144,7 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
   ###Tuning Values
   if (!is.null(tuning)) {
     if (!is.list(tuning)) stop('tuning must be a list')
-    if (!all(names(tuning) %in% c("NPilot", "TuneD", "TuneL", "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "EpsilonSGLDCorrected", "NSims", "NThin"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "EpsilonSGLDCorrected", "NSims", "NThin", "NPilot", "TuneL", or "TuneD"')
+    if (!all(names(tuning) %in% c("NPilot", "TuneD", "TuneL", "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD", "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin", "NTune", "NTune_seconds"))) stop('tuning: Can only contain objects with names "EpsilonNADAM", "MuNADAM", "AlphaNADAM", "NuNADAM", "S", "S_SGLD, "NEpochs", "R", "EpsilonSGLD", "NSims", "NThin", "NPilot", "TuneL", "TuneD", "NTune", or "NTune_seconds"')
     
     ###If L tuning values are provided
     if ("TuneL" %in% names(tuning)) {
@@ -236,6 +236,23 @@ CheckInputs <- function(pformula, gformula, group, data, family, algorithm, star
       if (!is.finite(tuning$NSims)) stop('tuning: "NSims" cannot be infinite')
       if (!is.wholenumber(tuning$NSims) | tuning$NSims <= 0) stop('tuning: "NSims" must be a positive integer')
       if (tuning$NSims < 100) stop('tuning: "NSims" must be at least 100')
+    }
+    
+    ###If NTune is provided
+    if ("NTune" %in% names(tuning)) {
+      if (!is.scalar(tuning$NTune)) stop('tuning: "NTune" must be a scalar')
+      if (is.na(tuning$NTune)) stop('tuning: "NTune" cannot be NA')
+      if (!is.finite(tuning$NTune)) stop('tuning: "NTune" cannot be infinite')
+      if (!is.wholenumber(tuning$NTune) | tuning$NTune <= 0) stop('tuning: "NTune" must be a positive integer')
+      if (tuning$NTune < 100) stop('tuning: "NTune" must be at least 100')
+    }
+    
+    ###If NTune_seconds tuning value is provided
+    if ("NTune_seconds" %in% names(tuning)) {
+      if (!is.scalar(tuning$NTune_seconds)) stop('tuning: "NTune_seconds" must be a scalar')
+      if (is.na(tuning$NTune_seconds)) stop('tuning: "NTune_seconds" cannot be NA')
+      if (!is.finite(tuning$NTune_seconds)) stop('tuning: "NTune_seconds" cannot be infinite')
+      if (tuning$NTune_seconds <= 0) stop('tuning: "NTune_seconds" must be positive')
     }
     
     ###If NThin is provided

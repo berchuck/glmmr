@@ -81,6 +81,14 @@
 #'  
 #'  \code{TuneD}: If using the \code{gibbs} algorithm, the tuning variances for \code{d} in the Metropolis step. Either a scalar or an \code{Q} dimensional vector. (default = 1)
 #'  
+#'  \code{NTune}: The number of iterations to tune the \code{EpsilonSGLD} value to avoid singularity of \code{L} (default = \code{100}). 
+#'  This is only performed for \code{algorithm = "sgld"} or \code{"sgld_corrected"}. For \code{"sgld"}, the initial value of epsilon is 
+#'  determined using \code{EpsilonSGLD}. Then, at each iteration, if a value of \code{l} is not able to produce a non-singular value of \code{L} 
+#'  within \code{NTune_seconds}, \code{EpsilonSGLD} is divided by 10. This repeats for \code{NTune} iterations. For \code{"sgld_corrected"},
+#'  the intial value of epsilon is determined as the minimum of \code{EpsilongSGLD} and the maximum eigen value of the correction matrix.
+#'  
+#'  \code{NTune_seconds}: The number of seconds that a non-singular value of \text{l} are sampled for for each interation of \code{NTune} (default = 1).
+#'  
 #' @param seed An integer value used to set the seed for the random number generator
 #'  (default = 54).
 #'  
@@ -144,9 +152,9 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   # algorithm = "sgld_corrected"
   # starting = NULL
   # hypers = NULL
-  # tuning = list(NSims = 1000, NEpochs = 250, S = 1, EpsilonSGLDCorrected = 10000)
+  # tuning = list(NSims = 1000, NEpochs = 1000, S = 1, NTune = 100, NTune_seconds = 1)
   # seed = 54
-  # timer = 60 * 3
+  # timer = NULL
 
   ###Check for missing objects
   if (missing(pformula)) stop("pformula: missing")
@@ -182,8 +190,10 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   ###Set regression objects
   OmegaMAP <- RegObj$map
   Omega <- RegObj$samples
-  epsilon <- RegObj$epsilon
-  TuningObj$EpsilonSGLD <- epsilon
+  TuningObj$EpsilonSGLDFinal <- RegObj$epsilon
+  TuningObj$Counter <- RegObj$counter
+  TuningObj$EpsilonTuneCounter <- RegObj$epsilontunecounter
+  TuningObj$LambdaMax <- TuningObj$EpsilonSGLDFinal * 10^TuningObj$EpsilonTuneCounter
   
   ###Set metropolis objec
   MetropRcpp <- RegObj$metropolis
@@ -193,10 +203,15 @@ glmmr <- function(pformula, gformula, group, data, family = "binomial", algorith
   LastIndex <- which.max(Timer == 0) - 1
   TimerOut <- NULL
   if (!is.null(timer)) {
-    if (algorithm != "sgd") {
+    if (algorithm == "gibbs") {
       TimerOut <- data.frame(stage = c(rep("burnin", TuningObj$NEpochs), rep("sampling", TuningObj$NSims))[1:LastIndex],
                           iteration = 1:LastIndex,
                           seconds = Timer[1:LastIndex])
+    }
+    if (algorithm %in% c("sgld", "sgld_corrected")) {
+      TimerOut <- data.frame(stage = c(rep("sgd", TuningObj$NEpochs), rep("tuning", TuningObj$NTune), rep("sampling", TuningObj$NSims))[1:LastIndex],
+                             iteration = 1:LastIndex,
+                             seconds = Timer[1:LastIndex])
     }
     if (algorithm == "sgd") {
       TimerOut <- data.frame(stage = c(rep("sgd", TuningObj$NEpochs))[1:LastIndex],

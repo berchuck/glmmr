@@ -72,7 +72,11 @@ para SampleBeta(datobj DatObj, para Para) {
     
   //Compute moments
   arma::mat cov_beta(P, P);
-  bool not_singular = arma::inv_sympd(cov_beta, sum1);
+  arma::mat prec_beta = sum1;
+  bool prec_symmetric = prec_beta.is_symmetric(0.001);
+  // Rcpp::Rcout << std::fixed << prec_beta << std::endl;
+  if (!prec_symmetric) Rcpp::stop("Beta covariance not symmetric");
+  bool not_singular = arma::inv_sympd(cov_beta, prec_beta);
   if (!not_singular) Rcpp::stop("Beta covariance singular");
   arma::colvec mean_beta = cov_beta * sum2;
     
@@ -123,7 +127,10 @@ para SampleGammaGibbs(datobj DatObj, para Para) {
     arma::mat tz_i_D_omega_i = arma::trans(z_i) * D_omega_i;
     // arma::mat cov_gamma = CholInv(tz_i_D_omega_i * z_i + SigmaInv);
     arma::mat cov_gamma(Q, Q);
-    bool not_singular = arma::inv_sympd(cov_gamma, tz_i_D_omega_i * z_i + SigmaInv);
+    arma::mat prec_gamma = tz_i_D_omega_i * z_i + SigmaInv;
+    bool prec_symmetric = prec_gamma.is_symmetric(0.001);
+    if (!prec_symmetric) Rcpp::stop("Gamma covariance not symmetric");
+    bool not_singular = arma::inv_sympd(cov_gamma, prec_gamma);
     if (!not_singular) Rcpp::stop("Gamma covariance singular");
     arma::colvec ystar = ((y_i - 0.5) / omega_i);
     arma::colvec mean_gamma = cov_gamma * (tz_i_D_omega_i * (ystar - x_i_beta));
@@ -396,9 +403,9 @@ std::pair<para, tuning> ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, p
   //Set tuning objects
   arma::vec WhichSGLDProgress = TuningObj.WhichSGLDProgress;
   arma::vec WhichSGLDProgressInt = TuningObj.WhichSGLDProgressInt;
-  double EpsilonSGLDCorrected = TuningObj.EpsilonSGLDCorrected;
   int S_SGLD = TuningObj.S_SGLD;
   int S = TuningObj.S;
+  double EpsilonSGLD = TuningObj.EpsilonSGLD;
   
   //User output
   BeginSGLDProgress(TuningObj, Interactive);
@@ -415,15 +422,18 @@ std::pair<para, tuning> ComputeSGLDCorrection(datobj DatObj, tuning TuningObj, p
     if (!Interactive) if (std::find(WhichSGLDProgressInt.begin(), WhichSGLDProgressInt.end(), i) != WhichSGLDProgressInt.end())
       UpdateSGLDBarInt(i, TuningObj);
   }
-  arma::mat SigmaPrime = arma::chol(SigmaSum) / sqrt(S);
+  // Rcpp::Rcout << std::fixed << (NUnits / (S_SGLD * S)) * SigmaSum << std::endl;
+  arma::mat SigmaPrime = arma::sqrtmat_sympd((NUnits / (S_SGLD * S)) * SigmaSum);
   
   //Compute EpsilonSGLD
   arma::cx_vec eigval = arma::eig_gen(SigmaPrime);
   arma::vec eigvalvec = arma::real(arma::sort(eigval, "descend"));
   double lambda_max = arma::as_scalar(eigvalvec(0));
   double EpsilonSGLDMax = 2 / (lambda_max * lambda_max); // maximum epsilon allowed
-  double EpsilonSGLD = EpsilonSGLDMax / EpsilonSGLDCorrected;
+  EpsilonSGLD = std::min(EpsilonSGLD, EpsilonSGLDMax);
 
+  // Rcpp::Rcout << std::fixed << EpsilonSGLDMax << std::endl;
+  
   //Compute 
   arma::mat Sigma = sqrt(2) * EyeNOmega - sqrt(EpsilonSGLD) * SigmaPrime;
   
@@ -537,22 +547,26 @@ para UpdatePara(datobj DatObj, para Para) {
   
   //Set parameters
   arma::colvec Omega = Para.Omega;
+  arma::colvec l = Para.l;
+  arma::mat Z = Para.Z;
+  arma::mat L = Para.L;
+  arma::mat LInv = Para.LInv;
   
   //Update other parameters
   arma::colvec Beta = Omega(arma::span(0, P - 1));
-  arma::colvec l = Omega(arma::span(P, P + NL - 1));
+  // arma::colvec l = Omega(arma::span(P, P + NL - 1));
   arma::colvec d = Omega(arma::span(P + NL, P + NL + Q - 1));
   
   //Update L
-  arma::mat Z = GetZ(l, Q);
-  arma::mat L = GetL(Z, Q);
-  // Rcpp::Rcout << std::fixed << L.diag() << arma::zeros(Q) << std::endl;
-  bool close_to_singular = any(L.diag() == 0);
-  // bool close_to_singular = approx_equal(L.diag(), arma::zeros(Q), "absdiff", 0.0001);
-  if (close_to_singular) Rcpp::stop("L is almost singular. Consider decreasing EpsilonSGLD.");
-  arma::mat LInv(Q, Q);
-  bool not_singular = arma::solve(LInv, arma::trimatl(L), EyeQ);
-  if (!not_singular) Rcpp::stop("L is singular. Decrease EpsilonSGLD.");
+  // arma::mat Z = GetZ(l, Q);
+  // arma::mat L = GetL(Z, Q);
+  // // Rcpp::Rcout << std::fixed << L.diag() << arma::zeros(Q) << std::endl;
+  // bool close_to_singular = any(L.diag() == 0);
+  // // bool close_to_singular = approx_equal(L.diag(), arma::zeros(Q), "absdiff", 0.0001);
+  // if (close_to_singular) Rcpp::stop("L is almost singular. Consider decreasing EpsilonSGLD.");
+  // arma::mat LInv(Q, Q);
+  // bool not_singular = arma::solve(LInv, arma::trimatl(L), EyeQ);
+  // if (!not_singular) Rcpp::stop("L is singular. Decrease EpsilonSGLD.");
   
   //Save parameters
   Para.Omega = Omega;
@@ -587,7 +601,11 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   //Set data objects
   int NOmega = DatObj.NOmega;
   int AlgorithmInd = DatObj.AlgorithmInd;
-
+  int P = DatObj.P;
+  int NL = DatObj.NL;
+  int Q = DatObj.Q;
+  arma::mat EyeQ = DatObj.EyeQ;
+  
   //Set tuning objects
   double EpsilonNADAM = TuningObj.EpsilonNADAM;
   double MuNADAM = TuningObj.MuNADAM;
@@ -597,6 +615,10 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
   arma::vec NNADAM = TuningObj.NNADAM;
   double EpsilonSGLD = TuningObj.EpsilonSGLD;
   int NEpochs = TuningObj.NEpochs;
+  int NTune = TuningObj.NTune;
+  double NTune_seconds = TuningObj.NTune_seconds;
+  int Counter = TuningObj.Counter;
+  int EpsilonTuneCounter = TuningObj.EpsilonTuneCounter;
   
   //Set parameters
   arma::colvec Omega = Para.Omega;
@@ -611,24 +633,124 @@ std::pair<para, tuning> UpdateOmega(int e, arma::colvec const& Grad, datobj DatO
       nhat = NuNADAM * NNADAM(i) / (1 - NuNADAM);
       Omega(i) = Omega(i) + AlphaNADAM / (sqrt(nhat) + EpsilonNADAM) * mhat;
     }
+    
+    //Update parameter object
+    Para.Omega = Omega;
+    
+    //Update tuning object
+    TuningObj.MNADAM = MNADAM;
+    TuningObj.NNADAM = NNADAM;
+
   }
   
   //Update omega using SGLD with or without the correction
   if (AlgorithmInd > 0) {
-    if (e >= NEpochs) {
-      if (AlgorithmInd == 1) Omega += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
-      if (AlgorithmInd == 2) Omega += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaSGLD); // SGLD with correction
+    if (e >= NEpochs & e < (NEpochs + NTune)) {
+      
+      //Begin while loop to guarentee that L is not singular
+      arma::colvec OmegaProposal(NOmega), l(NL);
+      arma::mat Z(Q, Q), L(Q, Q), LInv(Q, Q);
+      arma::wall_clock timer;
+      double secs;
+      // Rcpp::Rcout << std::fixed << EpsilonSGLD << " " << Grad << std::endl;
+      bool not_singular = false;
+      while (!not_singular) {
+        timer.tic();
+        secs = 0;
+        while (secs < NTune_seconds) {
+          
+          //Allow user to stop
+          Rcpp::checkUserInterrupt();
+          
+          //Update a temporary Omega
+          OmegaProposal = Omega;
+          if (AlgorithmInd == 1) OmegaProposal += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
+          if (AlgorithmInd == 2) OmegaProposal += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaSGLD); // SGLD with correction
+          
+          //Check if L is singular
+          l = OmegaProposal(arma::span(P, P + NL - 1));
+          Z = GetZ(l, Q);
+          L = GetL(Z, Q);
+          not_singular = arma::solve(LInv, arma::trimatl(L), EyeQ, arma::solve_opts::no_approx); // returns false if no solution is found
+          // if (Counter < 10) Rcpp::Rcout << std::fixed << e << " " << EpsilonSGLD << " " << not_singular << " " << Counter << std::endl;
+          // Rcpp::Rcout << std::fixed << e << " " << not_singular << " "<<  EpsilonSGLD << " " << l << std::endl;
+          
+          //Break if L becomes non-singular
+          if (not_singular) {
+            break;
+          }
+          
+          //Compute run time in seconds
+          secs = timer.toc();
+          
+        //End timed while loop
+        }
+    
+        //Update EpsilonSGLD if inner while loop takes too long
+        if (!not_singular) {
+          EpsilonSGLD *= 0.1;
+          if (AlgorithmInd == 2) {
+            arma::mat Sigma = sqrt(2) * DatObj.EyeNOmega - sqrt(EpsilonSGLD) * Para.SigmaPrime;
+            Para.SigmaSGLD = EpsilonSGLD * Sigma * Sigma.t();
+          }
+          EpsilonTuneCounter++;
+        }
+        
+      //End singularity while loop
+      }
+      
+      //Update parameter object
+      Para.Omega = OmegaProposal;
+      Para.l = l;
+      Para.Z = Z;
+      Para.L = L;
+      Para.LInv = LInv;
+      
+      //Update tuning object
+      TuningObj.EpsilonTuneCounter = EpsilonTuneCounter;
+      TuningObj.EpsilonSGLD = EpsilonSGLD;
+
+    }
+    if (e >= (NEpochs + NTune)) {
+      
+      //Begin while loop to guarentee that L is not singular
+      bool not_singular = false;
+      arma::colvec OmegaProposal(NOmega), l(NL);
+      arma::mat Z(Q, Q), L(Q, Q), LInv(Q, Q);
+      while (!not_singular) {
+      
+        //Update Counter
+        Rcpp::checkUserInterrupt();
+        Counter++;
+          
+        //Update a temporary Omega
+        OmegaProposal = Omega;
+        if (AlgorithmInd == 1) OmegaProposal += (0.5 * EpsilonSGLD * Grad + rnormRcpp(NOmega, 0, sqrt(EpsilonSGLD))); // SGLD from Welling et al. 2011
+        if (AlgorithmInd == 2) OmegaProposal += EpsilonSGLD * Grad + rmvnormRcpp(1, arma::zeros(NOmega), Para.SigmaSGLD); // SGLD with correction
+      
+        //Check if L is singular
+        l = OmegaProposal(arma::span(P, P + NL - 1));
+        Z = GetZ(l, Q);
+        L = GetL(Z, Q);
+        not_singular = arma::solve(LInv, arma::trimatl(L), EyeQ, arma::solve_opts::no_approx); // returns false if no solution is found
+        // if (Counter < 10) Rcpp::Rcout << std::fixed << e << " " << EpsilonSGLD << " " << not_singular << " " << Counter << std::endl;
+        
+      //End while loop
+      }
+      
+      //Update parameter object
+      Para.Omega = OmegaProposal;
+      Para.l = l;
+      Para.Z = Z;
+      Para.L = L;
+      Para.LInv = LInv;
+      
+      //Update tuning object
+      TuningObj.Counter = Counter;
+
     }
   }
-  //Update parameter object
-  Para.Omega = Omega;
-  
-  //Update tuning object
-  if (e < NEpochs) {
-    TuningObj.MNADAM = MNADAM;
-    TuningObj.NNADAM = NNADAM;
-  }
-  
+
   //Return updated Omega
   return std::pair<para, tuning>(Para, TuningObj);
   
@@ -925,8 +1047,8 @@ arma::mat GetL(arma::mat const& Z, int Q) {
       }
       if (j > 0) {
         arma::rowvec Li = L.row(i);
-        if (i > j) L(i, j) = Z(i, j) * sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2))));         
-        if (i == j) L(i, j) = sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2))));         
+        if (i > j) L(i, j) = Z(i, j) * sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2), 1)));         
+        if (i == j) L(i, j) = sqrt(1 - arma::as_scalar(arma::sum(arma::pow(Li.subvec(0, j - 1), 2), 1)));         
       }
     }
   }

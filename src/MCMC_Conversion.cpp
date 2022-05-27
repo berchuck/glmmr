@@ -92,10 +92,11 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   int NEpochs = TuningObj_List["NEpochs"];
   int R = TuningObj_List["R"];
   double EpsilonSGLD = TuningObj_List["EpsilonSGLD"];
-  double EpsilonSGLDCorrected = TuningObj_List["EpsilonSGLDCorrected"];
   int NSims = TuningObj_List["NSims"];
   int NKeep = TuningObj_List["NKeep"];
   int NTotal = TuningObj_List["NTotal"];
+  int NTune = TuningObj_List["NTune"];
+  double NTune_seconds = TuningObj_List["NTune_seconds"];
   int BarLength = TuningObj_List["BarLength"];
   arma::vec WhichKeep = TuningObj_List["WhichKeep"];
   arma::vec WhichMAPProgress = TuningObj_List["WhichMAPProgress"];
@@ -104,6 +105,8 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   arma::vec WhichSamplerProgressInt = TuningObj_List["WhichSamplerProgressInt"];
   arma::vec WhichSGLDProgress = TuningObj_List["WhichSGLDProgress"];
   arma::vec WhichSGLDProgressInt = TuningObj_List["WhichSGLDProgressInt"];
+  arma::vec WhichTuneProgress = TuningObj_List["WhichTuneProgress"];
+  arma::vec WhichTuneProgressInt = TuningObj_List["WhichTuneProgressInt"];
   arma::vec WhichPilotAdapt = TuningObj_List["WhichPilotAdapt"];
   int PilotAdaptDenominator = TuningObj_List["PilotAdaptDenominator"];
   arma::vec MetropL = TuningObj_List["MetropL"];
@@ -111,6 +114,8 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   arma::vec MetropD = TuningObj_List["MetropD"];
   arma::vec AcceptanceD = TuningObj_List["AcceptanceD"];
   arma::vec OriginalTuners = TuningObj_List["OriginalTuners"];
+  int Counter = TuningObj_List["Counter"];
+  int EpsilonTuneCounter = TuningObj_List["EpsilonTuneCounter"];
   
   //Convert to C++ struct
   tuning TuningObj;
@@ -125,9 +130,10 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.NEpochs = NEpochs;
   TuningObj.R = R;
   TuningObj.EpsilonSGLD = EpsilonSGLD;
-  TuningObj.EpsilonSGLDCorrected = EpsilonSGLDCorrected;
   TuningObj.NSims = NSims;
   TuningObj.NKeep = NKeep;
+  TuningObj.NTune = NTune;
+  TuningObj.NTune_seconds = NTune_seconds;
   TuningObj.NTotal = NTotal;
   TuningObj.BarLength = BarLength;
   TuningObj.WhichKeep = WhichKeep;
@@ -137,6 +143,8 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.WhichSamplerProgressInt = WhichSamplerProgressInt;
   TuningObj.WhichSGLDProgress = WhichSGLDProgress;
   TuningObj.WhichSGLDProgressInt = WhichSGLDProgressInt;
+  TuningObj.WhichTuneProgress = WhichTuneProgress;
+  TuningObj.WhichTuneProgressInt = WhichTuneProgressInt;
   TuningObj.WhichPilotAdapt = WhichPilotAdapt;
   TuningObj.PilotAdaptDenominator = PilotAdaptDenominator;
   TuningObj.MetropL = MetropL;
@@ -144,6 +152,8 @@ tuning ConvertTuningObj(Rcpp::List TuningObj_List) {
   TuningObj.MetropD = MetropD;
   TuningObj.AcceptanceD = AcceptanceD;
   TuningObj.OriginalTuners = OriginalTuners;
+  TuningObj.Counter = Counter;
+  TuningObj.EpsilonTuneCounter = EpsilonTuneCounter;
   return TuningObj;
   
 }

@@ -44,6 +44,26 @@ void BeginSGLDProgress(tuning TuningObj, bool Interactive) {
 
 
 //Initiate burn-in progress bar--------------------------------------------------------------------------
+void BeginTuneProgress(tuning TuningObj, bool Interactive) {
+  
+  //Set MCMC object
+  int BarLength = TuningObj.BarLength;
+  
+  //Initialize burn-in bar
+  if (Interactive) {
+    Rcpp::Rcout << std::fixed << "\nTuning Epsilon :  |";
+    for (int i = 0; i < BarLength - 1; i++) Rcpp::Rcout << std::fixed << " ";
+    Rcpp::Rcout << std::fixed <<  "|" << std::fixed;
+  }
+  if (!Interactive) {
+    Rcpp::Rcout << std::fixed << "\nTuning Epsilon :  0%..  ";
+  }
+  
+}
+
+
+
+//Initiate burn-in progress bar--------------------------------------------------------------------------
 void BeginSamplerProgress(tuning TuningObj, bool Interactive) {
   
   //Set MCMC object
@@ -95,6 +115,32 @@ void UpdateSGLDBarInt(int e, tuning TuningObj) {
   //Set MCMC object
   arma::vec WhichSGLDProgressInt = TuningObj.WhichSGLDProgressInt;
   arma::uvec NewStarBoolean = find(e == WhichSGLDProgressInt);
+  arma::vec NewStarBooleanVec = arma::conv_to<arma::vec>::from(NewStarBoolean);
+  int NewStar = NewStarBooleanVec(0);
+  
+  //Add percentage to submited job mode
+  Rcpp::Rcout.precision(0);
+  if (NewStar == 0) Rcpp::Rcout << std::fixed << "10%.. ";
+  if (NewStar == 1) Rcpp::Rcout << std::fixed << "20%.. ";
+  if (NewStar == 2) Rcpp::Rcout << std::fixed << "30%.. ";
+  if (NewStar == 3) Rcpp::Rcout << std::fixed << "40%.. ";
+  if (NewStar == 4) Rcpp::Rcout << std::fixed << "50%.. ";
+  if (NewStar == 5) Rcpp::Rcout << std::fixed << "60%.. ";
+  if (NewStar == 6) Rcpp::Rcout << std::fixed << "70%.. ";
+  if (NewStar == 7) Rcpp::Rcout << std::fixed << "80%.. ";
+  if (NewStar == 8) Rcpp::Rcout << std::fixed << "90%.. ";
+  if (NewStar == 9) Rcpp::Rcout << std::fixed << "100%!";
+  
+}
+
+
+
+//Update burn-in progress bar----------------------------------------------------------------------------
+void UpdateTuneBarInt(int e, tuning TuningObj) {
+  
+  //Set MCMC object
+  arma::vec WhichTuneProgressInt = TuningObj.WhichTuneProgressInt;
+  arma::uvec NewStarBoolean = find(e == WhichTuneProgressInt);
   arma::vec NewStarBooleanVec = arma::conv_to<arma::vec>::from(NewStarBoolean);
   int NewStar = NewStarBooleanVec(0);
   
@@ -174,6 +220,26 @@ void UpdateSGLDBar(int e, tuning TuningObj) {
   arma::vec NewStarBooleanVec = arma::conv_to<arma::vec>::from(NewStarBoolean);
   int NewStar = NewStarBooleanVec(0);
   Rcpp::Rcout << std::fixed << "\rSGLD Correction:  |";
+  for (int i = 0; i < NewStar; i++) Rcpp::Rcout << std::fixed << "*";
+  for (int i = 0; i < (BarLength - 1 - NewStar); i++) Rcpp::Rcout << std::fixed << " ";
+  Rcpp::Rcout << std::fixed << "|";
+  
+}
+
+
+
+//Update burn-in progress bar----------------------------------------------------------------------------
+void UpdateTuneBar(int e, tuning TuningObj) {
+  
+  //Set MCMC object
+  arma::vec WhichTuneProgress = TuningObj.WhichTuneProgress;
+  int BarLength = TuningObj.BarLength;
+  
+  //Add a new star
+  arma::uvec NewStarBoolean = find(e == WhichTuneProgress);
+  arma::vec NewStarBooleanVec = arma::conv_to<arma::vec>::from(NewStarBoolean);
+  int NewStar = NewStarBooleanVec(0);
+  Rcpp::Rcout << std::fixed << "\rTuning Epsilon :  |";
   for (int i = 0; i < NewStar; i++) Rcpp::Rcout << std::fixed << "*";
   for (int i = 0; i < (BarLength - 1 - NewStar); i++) Rcpp::Rcout << std::fixed << " ";
   Rcpp::Rcout << std::fixed << "|";

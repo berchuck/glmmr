@@ -47,10 +47,11 @@ struct tuning {
   int NEpochs;
   int R;
   double EpsilonSGLD;
-  double EpsilonSGLDCorrected;
   int NSims;
   int NTotal;
   int NKeep;
+  int NTune;
+  double NTune_seconds;
   int BarLength;
   arma::vec WhichKeep;
   arma::vec WhichMAPProgress;
@@ -59,6 +60,8 @@ struct tuning {
   arma::vec WhichSamplerProgressInt;
   arma::vec WhichSGLDProgress;
   arma::vec WhichSGLDProgressInt;
+  arma::vec WhichTuneProgress;
+  arma::vec WhichTuneProgressInt;
   arma::vec WhichPilotAdapt;
   int PilotAdaptDenominator;
   arma::vec MetropL;
@@ -66,6 +69,8 @@ struct tuning {
   arma::vec MetropD;
   arma::vec AcceptanceD; 
   arma::vec OriginalTuners;
+  int Counter;
+  int EpsilonTuneCounter;
 };
 struct para {
   arma::colvec Beta;
@@ -147,6 +152,9 @@ void UpdateMAPBarInt(int e, tuning TuningObj);
 void BeginSamplerProgress(tuning TuningObj, bool Interactive);
 void UpdateSamplerBarInt(int e, tuning TuningObj);
 void UpdateSamplerBar(int e, tuning TuningObj);
+void BeginTuneProgress(tuning TuningObj, bool Interactive);
+void UpdateTuneBarInt(int e, tuning TuningObj);
+void UpdateTuneBar(int e, tuning TuningObj);
 void BeginSGLDProgress(tuning TuningObj, bool Interactive);
 void UpdateSGLDBarInt(int e, tuning TuningObj);
 void UpdateSGLDBar(int e, tuning TuningObj);
